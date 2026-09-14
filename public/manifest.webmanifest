@@ -1,0 +1,12 @@
+{
+  "name": "Euro Plaza",
+  "short_name": "Euro Plaza",
+  "description": "Управление строительными проектами Euro Plaza Group",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0a1f44",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
