@@ -16,6 +16,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { DataList, DataListRow } from "@/components/shared/data-list";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { MoneyText } from "@/components/shared/money-text";
+import { AttachmentSection } from "@/components/shared/attachment-section";
 import {
   useSupplier,
   useSupplierLedger,
@@ -176,10 +177,19 @@ function AdvanceDialog({
   const [comment, setComment] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayBusinessDate());
   const [formError, setFormError] = useState<string | null>(null);
+  const [fundingPaymentId, setFundingPaymentId] = useState<string | null>(null);
 
   const { data: currencyRates = [] } = useCurrencyRates();
   const createMutation = useCreateSupplierAdvance();
   const { key, renew } = useIdempotencyKey();
+
+  const reset = () => {
+    setAmount("");
+    setComment("");
+    setOccurredAt(todayBusinessDate());
+    setFormError(null);
+    setFundingPaymentId(null);
+  };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,15 +223,41 @@ function AdvanceDialog({
         idempotencyKey: key,
       },
       {
-        onSuccess: () => {
+        onSuccess: (advance) => {
           renew();
           toast.success("Аванс оформлен");
-          onOpenChange(false);
+          setFundingPaymentId(advance.fundingPaymentId);
         },
         onError: (err) => toast.error(getErrorMessage(err)),
       },
     );
   };
+
+  if (fundingPaymentId) {
+    return (
+      <ResponsiveDialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) reset();
+          onOpenChange(next);
+        }}
+        title="Аванс оформлен"
+      >
+        <div className="space-y-4">
+          <AttachmentSection target="SUPPLIER_PAYMENT" targetId={fundingPaymentId} canMutate />
+          <Button
+            className="h-11 w-full"
+            onClick={() => {
+              reset();
+              onOpenChange(false);
+            }}
+          >
+            Готово
+          </Button>
+        </div>
+      </ResponsiveDialog>
+    );
+  }
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange} title="Новый аванс поставщику">
@@ -312,10 +348,22 @@ function DebtPaymentDialog({
   const [comment, setComment] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayBusinessDate());
   const [formError, setFormError] = useState<string | null>(null);
+  const [fundingPaymentId, setFundingPaymentId] = useState<string | null>(null);
+  const [paid, setPaid] = useState(false);
 
   const { data: currencyRates = [] } = useCurrencyRates();
   const createMutation = useCreateDebtPayment();
   const { key, renew } = useIdempotencyKey();
+
+  const reset = () => {
+    setPurchaseId("");
+    setAmount("");
+    setComment("");
+    setOccurredAt(todayBusinessDate());
+    setFormError(null);
+    setFundingPaymentId(null);
+    setPaid(false);
+  };
 
   const selectedPurchase = payable.find((p) => p.id === purchaseId);
   const needsSettlementRate =
@@ -363,15 +411,49 @@ function DebtPaymentDialog({
         idempotencyKey: key,
       },
       {
-        onSuccess: () => {
+        onSuccess: (allocation) => {
           renew();
           toast.success("Оплата проведена");
-          onOpenChange(false);
+          if (allocation.fundingPaymentId) {
+            setFundingPaymentId(allocation.fundingPaymentId);
+          } else {
+            // Advance-funded settlement — no SupplierPayment row to attach
+            // a document to, so there's nothing more to do here.
+            reset();
+            onOpenChange(false);
+          }
+          setPaid(true);
         },
         onError: (err) => toast.error(getErrorMessage(err)),
       },
     );
   };
+
+  if (paid && fundingPaymentId) {
+    return (
+      <ResponsiveDialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) reset();
+          onOpenChange(next);
+        }}
+        title="Оплата проведена"
+      >
+        <div className="space-y-4">
+          <AttachmentSection target="SUPPLIER_PAYMENT" targetId={fundingPaymentId} canMutate />
+          <Button
+            className="h-11 w-full"
+            onClick={() => {
+              reset();
+              onOpenChange(false);
+            }}
+          >
+            Готово
+          </Button>
+        </div>
+      </ResponsiveDialog>
+    );
+  }
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange} title="Оплата долга поставщику">

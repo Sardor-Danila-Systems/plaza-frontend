@@ -346,6 +346,97 @@ export interface WriteOff {
   cancelledById: string | null;
 }
 
+export type AttachmentStatus = "PENDING" | "READY" | "LINKED" | "FAILED";
+
+/** Only these three target types exist server-side — see
+ * plaza-api/src/modules/attachments/attachment-target.enum.ts. A
+ * FINANCIAL_TRANSACTION target is only accepted for INCOME/EXPENSE rows
+ * (not DEBT_PAYMENT/ADVANCE, which use SUPPLIER_PAYMENT instead). */
+export type AttachmentTarget = "PURCHASE" | "FINANCIAL_TRANSACTION" | "SUPPLIER_PAYMENT";
+
+export interface Attachment {
+  id: string;
+  projectId: string;
+  status: AttachmentStatus;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedById: string;
+  createdAt: string;
+  readyAt: string | null;
+  linkedAt: string | null;
+  failedAt: string | null;
+  failureReason: string | null;
+  target: AttachmentTarget | null;
+  targetId: string | null;
+}
+
+export interface AuditLog {
+  id: string;
+  projectId: string;
+  actorId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  operationId: string | null;
+  requestId: string | null;
+  previousData: Record<string, unknown> | null;
+  newData: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface CashFlow {
+  opening: string;
+  periodInflow: string;
+  periodOutflow: string;
+  closing: string;
+  current: string;
+}
+
+export interface CategoryAmount {
+  categoryId: string;
+  categoryName: string;
+  amountUzs: string;
+}
+
+export interface AnalyticsSummary {
+  projectId: string;
+  dateFrom: string | null;
+  dateTo: string | null;
+  generatedAt: string;
+  postingSequenceCutoff: string;
+  cashUzs: CashFlow;
+  cashUsd: CashFlow;
+  expensesByCategory: CategoryAmount[];
+  salariesUzs: string;
+  purchasesTotalUzs: string;
+  purchasesCount: number;
+  supplierDebtAsOf: CurrencyAmount[];
+  supplierAdvancesAvailableAsOf: CurrencyAmount[];
+  currentInventoryValueUzs: string;
+  inventoryValueAsOfUzs: string;
+}
+
+export interface MaterialAnalyticsRow {
+  materialId: string;
+  materialName: string;
+  purchasedQuantity: string;
+  purchasedValueUzs: string;
+  consumedQuantity: string;
+  consumedValueUzs: string;
+}
+
+export interface ConstructionAnalyticsRow {
+  blockId: string;
+  blockName: string;
+  floorId: string;
+  floorLabel: string;
+  materialId: string;
+  materialName: string;
+  quantity: string;
+  valueUzs: string;
+}
+
 export interface Transfer {
   id: string;
   projectId: string;

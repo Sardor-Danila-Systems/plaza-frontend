@@ -19,6 +19,15 @@ const ERROR_MESSAGES_RU: Record<string, string> = {
   DATABASE_ERROR: "Произошла ошибка на сервере. Попробуйте ещё раз.",
   USER_DISABLED: "Ваша сессия больше недействительна. Войдите снова.",
   SETTLEMENT_RATE_REQUIRED: "Укажите курс для этой операции.",
+  PROJECT_ACCESS_DENIED: "У вас нет доступа к этому проекту.",
+  FILE_TOO_LARGE: "Файл слишком большой.",
+  UNSUPPORTED_FILE_TYPE: "Поддерживаются только файлы JPEG, PNG, WebP и PDF.",
+  ATTACHMENT_UPLOAD_FAILED: "Не удалось загрузить файл. Попробуйте ещё раз.",
+  ATTACHMENT_NOT_READY: "Файл ещё не готов. Попробуйте через момент.",
+  UNSUPPORTED_ATTACHMENT_TARGET: "К этой операции нельзя прикрепить файл.",
+  ATTACHMENT_LINKED: "Прикреплённый файл нельзя удалить.",
+  INTERNAL_ERROR: "Произошла ошибка на сервере. Попробуйте ещё раз.",
+  NETWORK_ERROR: "Нет соединения с сервером. Проверьте интернет.",
 };
 
 const GENERIC_MESSAGE = "Что-то пошло не так. Попробуйте ещё раз.";

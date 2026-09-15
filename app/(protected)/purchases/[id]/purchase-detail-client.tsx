@@ -12,6 +12,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { MoneyText } from "@/components/shared/money-text";
 import { PurchaseStatusBadge } from "@/components/shared/status-badge";
 import { ConfirmReasonDialog } from "@/components/shared/confirm-dialog";
+import { AttachmentSection } from "@/components/shared/attachment-section";
 import { usePurchase, useCancelPurchase } from "@/lib/query/hooks/use-purchases";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { formatBusinessDate, formatDateTime } from "@/lib/format/date";
@@ -113,6 +114,8 @@ export function PurchaseDetailClient({ id }: { id: string }) {
           </CardContent>
         </Card>
       )}
+
+      <AttachmentSection target="PURCHASE" targetId={id} canMutate={canMutate} />
 
       {canCancel && (
         <Button variant="destructive" className="w-full" onClick={() => setCancelOpen(true)}>

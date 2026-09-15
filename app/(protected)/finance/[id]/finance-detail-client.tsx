@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import { MoneyText } from "@/components/shared/money-text";
 import { ConfirmReasonDialog } from "@/components/shared/confirm-dialog";
+import { AttachmentSection } from "@/components/shared/attachment-section";
 import { useFinanceDetail, useCancelFinanceTransaction } from "@/lib/query/hooks/use-finance";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { formatBusinessDate, formatDateTime } from "@/lib/format/date";
@@ -109,6 +110,10 @@ export function FinanceDetailClient({ id }: { id: string }) {
           </dl>
         </CardContent>
       </Card>
+
+      {(data.type === "INCOME" || data.type === "EXPENSE") && (
+        <AttachmentSection target="FINANCIAL_TRANSACTION" targetId={id} canMutate={canMutate} />
+      )}
 
       {canCancel && (
         <Button variant="destructive" className="w-full" onClick={() => setCancelOpen(true)}>

@@ -16,6 +16,11 @@
  * empirically via a hidden same-origin iframe navigated to
  * `/auth/csrf-bridge` (a blank page that exists solely for this). This
  * reads the real cookie value; it does not touch the backend contract.
+ *
+ * Re-verified against the final (Phase 13) backend: `AUTH_COOKIE_PATH` is
+ * still `/auth`, and its own doc comment now states explicitly that this is
+ * deliberate — "neither cookie is ever sent on ordinary business API
+ * requests." This bridge remains required.
  */
 export async function readCsrfToken(): Promise<string | null> {
   if (typeof document === "undefined") return null;

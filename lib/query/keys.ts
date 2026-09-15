@@ -50,6 +50,18 @@ export const qk = {
       ["transfers", projectId, "list", filters] as const,
     detail: (projectId: string, id: string) => ["transfers", projectId, "detail", id] as const,
   },
+  attachments: {
+    list: (projectId: string, target: string, targetId: string) =>
+      ["attachments", projectId, target, targetId] as const,
+  },
+  audit: {
+    list: (projectId: string, filters: object) => ["audit", projectId, "list", filters] as const,
+  },
+  analytics: {
+    summary: (projectId: string, filters: object) => ["analytics", projectId, "summary", filters] as const,
+    materials: (projectId: string, filters: object) => ["analytics", projectId, "materials", filters] as const,
+    construction: (projectId: string, filters: object) => ["analytics", projectId, "construction", filters] as const,
+  },
 } as const;
 
 /** Root namespaces to clear entirely when the active project changes. */
@@ -61,4 +73,7 @@ export const PROJECT_SCOPED_NAMESPACES = [
   "purchases",
   "write-offs",
   "transfers",
+  "attachments",
+  "audit",
+  "analytics",
 ] as const;

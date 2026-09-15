@@ -14,6 +14,9 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   HandCoins,
+  BarChart3,
+  ScrollText,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export interface NavItem {
@@ -33,6 +36,9 @@ export const SECTIONS: NavItem[] = [
   { href: "/write-offs", label: "Списания", icon: ClipboardMinus },
   { href: "/transfers", label: "Перемещения", icon: ArrowLeftRight },
   { href: "/history", label: "История", icon: History },
+  { href: "/analytics", label: "Аналитика", icon: BarChart3 },
+  { href: "/audit", label: "Аудит", icon: ScrollText },
+  { href: "/reports", label: "Отчёты", icon: FileSpreadsheet },
   { href: "/settings/construction", label: "Объекты", icon: Settings },
 ];
 

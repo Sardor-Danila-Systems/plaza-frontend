@@ -129,3 +129,124 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
 
   return (await response.json()) as T;
 }
+
+function parseFilename(contentDisposition: string | null, fallback: string): string {
+  if (!contentDisposition) return fallback;
+  const match = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return match ? match[1] : fallback;
+}
+
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string;
+}
+
+/**
+ * For binary GET routes (attachment download, XLSX reports) — apiFetch
+ * always parses JSON, which a file response isn't. Shares the same
+ * auth-header/401-refresh-retry behavior, but returns a Blob instead.
+ */
+export async function apiFetchBlob(
+  path: string,
+  options: { query?: Record<string, QueryValue>; fallbackFilename: string; skipAuthRetry?: boolean } = {
+    fallbackFilename: "file",
+  },
+): Promise<DownloadedFile> {
+  const { query, fallbackFilename, skipAuthRetry } = options;
+  const headers: Record<string, string> = {};
+  const accessToken = useAuthStore.getState().accessToken;
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  const response = await fetch(buildUrl(path, query), {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  if (response.status === 401 && !skipAuthRetry) {
+    try {
+      await refreshAccessToken();
+    } catch {
+      useAuthStore.getState().clear();
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      if (typeof window !== "undefined") window.location.href = "/login";
+      throw new ApiError(401, "UNAUTHENTICATED", "Сессия истекла");
+    }
+    return apiFetchBlob(path, { ...options, skipAuthRetry: true });
+  }
+
+  if (!response.ok) {
+    throw await parseErrorBody(response);
+  }
+
+  const blob = await response.blob();
+  const filename = parseFilename(response.headers.get("Content-Disposition"), fallbackFilename);
+  return { blob, filename };
+}
+
+/**
+ * Multipart upload with real progress (fetch has no upload-progress event,
+ * only XMLHttpRequest does). Mirrors apiFetch's single-retry-on-401
+ * behavior but stays a plain callback API since XHR predates promises.
+ */
+export function apiUploadFile(
+  path: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const attempt = (skipAuthRetry: boolean) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", buildUrl(path));
+      xhr.withCredentials = true;
+      const accessToken = useAuthStore.getState().accessToken;
+      if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) onProgress(event.loaded / event.total);
+      };
+
+      xhr.onload = async () => {
+        if (xhr.status === 401 && !skipAuthRetry) {
+          try {
+            await refreshAccessToken();
+          } catch {
+            useAuthStore.getState().clear();
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+            if (typeof window !== "undefined") window.location.href = "/login";
+            reject(new ApiError(401, "UNAUTHENTICATED", "Сессия истекла"));
+            return;
+          }
+          attempt(true);
+          return;
+        }
+        let body: unknown = undefined;
+        try {
+          body = xhr.responseText ? JSON.parse(xhr.responseText) : undefined;
+        } catch {
+          // non-JSON body, leave undefined
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(body);
+        } else {
+          const parsed = body as { code?: string; message?: string | string[]; requestId?: string } | undefined;
+          reject(
+            new ApiError(
+              xhr.status,
+              parsed?.code ?? "UNKNOWN_ERROR",
+              Array.isArray(parsed?.message) ? parsed.message.join(", ") : (parsed?.message ?? "Upload failed"),
+              parsed?.requestId,
+            ),
+          );
+        }
+      };
+
+      xhr.onerror = () => reject(new ApiError(0, "NETWORK_ERROR", "Сеть недоступна"));
+
+      const formData = new FormData();
+      formData.append("file", file);
+      xhr.send(formData);
+    };
+    attempt(false);
+  });
+}

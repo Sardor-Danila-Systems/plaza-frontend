@@ -10,6 +10,12 @@ import type { SupplierAdvance } from "@/lib/api/types";
  * `availableAdvance` total (by currency) is always shown alongside it for
  * full visibility, and this list only ever grows from advances this browser
  * itself created.
+ *
+ * Re-verified against the final (Phase 13) backend: `supplier-advances.
+ * controller.ts` still declares exactly one route (`POST`). The only
+ * server-side enumeration of a supplier's advances is
+ * `GET .../reports/advances.xlsx` — a binary export, not usable for a
+ * picker. This remains the one real reportable backend integration gap.
  */
 const STORAGE_PREFIX = "plaza:known-advances:";
 

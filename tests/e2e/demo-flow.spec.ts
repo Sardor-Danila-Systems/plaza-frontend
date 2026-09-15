@@ -79,6 +79,29 @@ test.describe("role-based UI", () => {
     // Manager's switcher is plain text, no dropdown trigger button.
     await expect(page.locator('header [class*="justify-between"]')).toHaveCount(0);
   });
+
+  test("OWNER and ACCOUNTANT have read access to analytics/audit/reports but no mutation controls", async ({
+    page,
+  }) => {
+    for (const creds of [OWNER, ACCOUNTANT]) {
+      await login(page, creds);
+      for (const path of ["/analytics", "/audit", "/reports"]) {
+        await page.goto(path);
+        await expect(page.getByText(/Application error|Cannot read propert/i)).toHaveCount(0);
+        await expect(page.locator("h1")).toBeVisible();
+      }
+      // Read-only: no upload control on a purchase detail page, and the
+      // reports page still lets them download (READ, not a mutation).
+      await page.goto("/purchases");
+      const firstPurchase = page.locator('a[href^="/purchases/"]').first();
+      if (await firstPurchase.count()) {
+        await firstPurchase.click();
+        await expect(page.locator('input[type=file]')).toHaveCount(0);
+      }
+      await page.getByRole("button", { name: "Выйти" }).click();
+      await page.waitForURL(/\/login$/);
+    }
+  });
 });
 
 test.describe("core business flow (PROJECT_MANAGER)", () => {
@@ -132,7 +155,12 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     await page.locator('input[inputmode=decimal]').first().fill("1000000");
     const submit = page.locator('button[type=submit]:has-text("Оформить аванс")');
     await submit.click();
-    await expect(page.getByText("Аванс оформлен")).toBeVisible({ timeout: 10000 });
+    // The dialog stays open after success so a document can be attached to
+    // the advance's SupplierPayment (target=SUPPLIER_PAYMENT) — see
+    // supplier-detail-client.tsx's AdvanceDialog.
+    await expect(page.getByRole("heading", { name: "Аванс оформлен" })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Документы")).toBeVisible();
+    await page.getByRole("button", { name: "Готово" }).click();
     await expect(page.getByText("1 000 000,00 сум")).toBeVisible();
   });
 
@@ -241,11 +269,58 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     // with "Cannot read properties of undefined" while every other test
     // here only ever visited detail pages, so the bug went undetected.
     // This test's only job is to catch that class of mismatch again.
-    for (const path of ["/finance", "/purchases", "/write-offs", "/transfers", "/history"]) {
+    for (const path of ["/finance", "/purchases", "/write-offs", "/transfers", "/history", "/analytics", "/audit", "/reports"]) {
       await page.goto(path);
       await expect(page.getByText(/Application error|Cannot read propert/i)).toHaveCount(0);
       await expect(page.locator("h1")).toBeVisible();
     }
+  });
+
+  test("upload and download an attachment on the purchase", async () => {
+    await login(page, MANAGER);
+    await page.goto(purchaseUrl);
+    await expect(page.getByText("Документы")).toBeVisible();
+
+    await page.locator('input[type=file]').setInputFiles({
+      name: "invoice.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\n%%EOF"),
+    });
+    await expect(page.getByText("invoice.pdf")).toBeVisible({ timeout: 10000 });
+
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/attachments/") && r.url().includes("/download")),
+      page.getByLabel("Скачать файл").first().click(),
+    ]);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("application/pdf");
+  });
+
+  test("analytics summary reflects real project data", async () => {
+    await login(page, MANAGER);
+    await page.goto("/analytics");
+    await expect(page.getByText("Этот месяц")).toBeVisible();
+    // Cash card must show a real computed balance, not a stuck loading/error state.
+    await expect(page.locator("text=Касса, сум").locator("..")).toBeVisible();
+    await expect(page.getByText(/\d[\d\s]*,\d\d\s*сум/).first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test("audit log shows readable entries, never a raw JSON dump by default", async () => {
+    await login(page, MANAGER);
+    await page.goto("/audit");
+    await expect(page.getByText("Записей не найдено")).toHaveCount(0);
+    await expect(page.locator('pre')).toHaveCount(0); // collapsed by default
+  });
+
+  test("XLSX report downloads a real spreadsheet file", async () => {
+    await login(page, MANAGER);
+    await page.goto("/reports");
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/reports/") && r.url().includes(".xlsx")),
+      page.locator('button:has-text("Скачать")').first().click(),
+    ]);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("spreadsheetml");
   });
 
   test("cancelling the purchase is blocked with a clean dependency message", async () => {
