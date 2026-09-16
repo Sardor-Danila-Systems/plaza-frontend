@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,10 +25,61 @@ const TYPE_LABELS: Record<CreatableTransactionType, string> = {
 
 export default function NewFinanceTransactionPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const initialType = (searchParams.get("type") as CreatableTransactionType | null) ?? "INCOME";
+  // The URL's `type` param is the single source of truth — not a useState
+  // seeded from it once. A useState initial value only runs on mount, so a
+  // client-side navigation from the quick-action FAB (e.g. Доход -> Расход)
+  // that reuses this already-mounted route/component never re-read it,
+  // leaving the form stuck on whichever type was open first. Deriving it
+  // fresh every render fixes that regardless of whether the component
+  // remounts, and switching tabs below writes back to the URL so it stays
+  // authoritative in both directions.
+  const type = (searchParams.get("type") as CreatableTransactionType | null) ?? "INCOME";
 
-  const [type, setType] = useState<CreatableTransactionType>(initialType);
+  const setType = (next: CreatableTransactionType) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("type", next);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  return (
+    <div className="mx-auto max-w-lg space-y-4 pb-24">
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="size-4" />
+        </Button>
+        <h1 className="text-lg font-semibold">Новая операция</h1>
+      </div>
+
+      <Tabs value={type} onValueChange={(v) => setType(v as CreatableTransactionType)}>
+        <TabsList className="grid w-full grid-cols-3">
+          {(Object.keys(TYPE_LABELS) as CreatableTransactionType[]).map((t) => (
+            <TabsTrigger key={t} value={t}>
+              {TYPE_LABELS[t]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      {/* `key={type}` remounts the form fresh on every type switch (FAB or
+       * tab click) — React's own recommended way to reset a subtree's state
+       * when a value changes, instead of an effect that resets each field
+       * by hand. A type switch is logically a new entry: nothing about a
+       * half-typed EXPENSE should carry over into a freshly opened SALARY
+       * form. */}
+      <FinanceForm key={type} type={type} router={router} />
+    </div>
+  );
+}
+
+function FinanceForm({
+  type,
+  router,
+}: {
+  type: CreatableTransactionType;
+  router: ReturnType<typeof useRouter>;
+}) {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<Currency>("UZS");
   const [rateMode, setRateMode] = useState<"referenced" | "manual">("referenced");
@@ -95,149 +146,130 @@ export default function NewFinanceTransactionPage() {
   };
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 pb-24">
-      <div className="flex items-center gap-2">
-        <Button type="button" variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="size-4" />
-        </Button>
-        <h1 className="text-lg font-semibold">Новая операция</h1>
+    <form onSubmit={onSubmit} className="space-y-4">
+      {formError && <p className="text-sm text-destructive">{formError}</p>}
+
+      <div className="space-y-2">
+        <Label htmlFor="amount">Сумма</Label>
+        <div className="flex gap-2">
+          <Input
+            id="amount"
+            inputMode="decimal"
+            className="h-11 flex-1"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+          />
+          <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
+            <SelectTrigger className="h-11 w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="UZS">UZS</SelectItem>
+              <SelectItem value="USD">USD</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <Tabs value={type} onValueChange={(v) => setType(v as CreatableTransactionType)}>
-        <TabsList className="grid w-full grid-cols-3">
-          {(Object.keys(TYPE_LABELS) as CreatableTransactionType[]).map((t) => (
-            <TabsTrigger key={t} value={t}>
-              {TYPE_LABELS[t]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      {currency === "USD" && (
+        <div className="space-y-3 rounded-lg border p-3">
+          <Tabs value={rateMode} onValueChange={(v) => setRateMode(v as "referenced" | "manual")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="referenced">Курс из списка</TabsTrigger>
+              <TabsTrigger value="manual">Свой курс</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        {formError && <p className="text-sm text-destructive">{formError}</p>}
-
-        <div className="space-y-2">
-          <Label htmlFor="amount">Сумма</Label>
-          <div className="flex gap-2">
-            <Input
-              id="amount"
-              inputMode="decimal"
-              className="h-11 flex-1"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-            />
-            <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-              <SelectTrigger className="h-11 w-24">
-                <SelectValue />
+          {rateMode === "referenced" ? (
+            <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue placeholder="Выберите курс" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="UZS">UZS</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {currency === "USD" && (
-          <div className="space-y-3 rounded-lg border p-3">
-            <Tabs value={rateMode} onValueChange={(v) => setRateMode(v as "referenced" | "manual")}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="referenced">Курс из списка</TabsTrigger>
-                <TabsTrigger value="manual">Свой курс</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {rateMode === "referenced" ? (
-              <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Выберите курс" />
-                </SelectTrigger>
-                <SelectContent>
-                  {currencyRates.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.rateUzs} сум ({r.effectiveOn})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="space-y-2">
-                <Input
-                  inputMode="decimal"
-                  className="h-11"
-                  placeholder="Курс, сум за 1 USD"
-                  value={exchangeRate}
-                  onChange={(e) => setExchangeRate(e.target.value)}
-                />
-                <Textarea
-                  placeholder="Причина ручного ввода курса"
-                  value={rateOverrideReason}
-                  onChange={(e) => setRateOverrideReason(e.target.value)}
-                  rows={2}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {relevantCategories.length > 0 && (
-          <div className="space-y-2">
-            <Label id="finance-category-label">Категория</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger className="h-11 w-full" aria-labelledby="finance-category-label">
-                <SelectValue placeholder="Без категории" />
-              </SelectTrigger>
-              <SelectContent>
-                {relevantCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
+                {currencyRates.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.rateUzs} сум ({r.effectiveOn})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        )}
+          ) : (
+            <div className="space-y-2">
+              <Input
+                inputMode="decimal"
+                className="h-11"
+                placeholder="Курс, сум за 1 USD"
+                value={exchangeRate}
+                onChange={(e) => setExchangeRate(e.target.value)}
+              />
+              <Textarea
+                placeholder="Причина ручного ввода курса"
+                value={rateOverrideReason}
+                onChange={(e) => setRateOverrideReason(e.target.value)}
+                rows={2}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
+      {relevantCategories.length > 0 && (
         <div className="space-y-2">
-          <Label htmlFor="party">{type === "INCOME" ? "Источник" : "Получатель"}</Label>
-          <Input
-            id="party"
-            className="h-11"
-            value={party}
-            onChange={(e) => setParty(e.target.value)}
-            placeholder={type === "INCOME" ? "Например, взнос учредителя" : "Например, ФИО или организация"}
-          />
+          <Label id="finance-category-label">Категория</Label>
+          <Select value={categoryId} onValueChange={setCategoryId}>
+            <SelectTrigger className="h-11 w-full" aria-labelledby="finance-category-label">
+              <SelectValue placeholder="Без категории" />
+            </SelectTrigger>
+            <SelectContent>
+              {relevantCategories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+      )}
 
-        <div className="space-y-2">
-          <Label htmlFor="occurredAt">Дата</Label>
-          <Input
-            id="occurredAt"
-            type="date"
-            className="h-11"
-            value={occurredAt}
-            max={todayBusinessDate()}
-            onChange={(e) => setOccurredAt(e.target.value)}
-          />
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="party">{type === "INCOME" ? "Источник" : "Получатель"}</Label>
+        <Input
+          id="party"
+          className="h-11"
+          value={party}
+          onChange={(e) => setParty(e.target.value)}
+          placeholder={type === "INCOME" ? "Например, взнос учредителя" : "Например, ФИО или организация"}
+        />
+      </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="comment">Комментарий</Label>
-          <Textarea
-            id="comment"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={2}
-          />
-        </div>
+      <div className="space-y-2">
+        <Label htmlFor="occurredAt">Дата</Label>
+        <Input
+          id="occurredAt"
+          type="date"
+          className="h-11"
+          value={occurredAt}
+          max={todayBusinessDate()}
+          onChange={(e) => setOccurredAt(e.target.value)}
+        />
+      </div>
 
-        <div className="sticky bottom-0 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:px-0 md:py-0">
-          <Button type="submit" className="h-11 w-full" disabled={createMutation.isPending}>
-            {createMutation.isPending ? "Сохранение…" : "Сохранить"}
-          </Button>
-        </div>
-      </form>
-    </div>
+      <div className="space-y-2">
+        <Label htmlFor="comment">Комментарий</Label>
+        <Textarea
+          id="comment"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          rows={2}
+        />
+      </div>
+
+      <div className="sticky bottom-0 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:px-0 md:py-0">
+        <Button type="submit" className="h-11 w-full" disabled={createMutation.isPending}>
+          {createMutation.isPending ? "Сохранение…" : "Сохранить"}
+        </Button>
+      </div>
+    </form>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,15 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
-import { MoneyText } from "@/components/shared/money-text";
+import { CombinedCashCard } from "@/components/shared/combined-cash-card";
 import { useAnalyticsSummary, useMaterialsAnalytics, useConstructionAnalytics } from "@/lib/query/hooks/use-analytics";
 import { useMaterials } from "@/lib/query/hooks/use-inventory";
 import { useBlocks, useFloors } from "@/lib/query/hooks/use-construction";
-import { formatMoney, formatQuantity } from "@/lib/format/decimal";
+import { useCombinedCash } from "@/lib/query/hooks/use-combined-cash";
+import { formatMoney, formatMoneyAbbrev, formatQuantity } from "@/lib/format/decimal";
 import { todayBusinessDate, toExclusiveEndDate } from "@/lib/format/date";
 import { BarChart3 } from "lucide-react";
+import Decimal from "decimal.js";
 
 function firstOfMonth(): string {
   const d = new Date();
@@ -29,29 +33,15 @@ function daysAgo(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function CashCard({ title, cash, currency }: { title: string; cash: { opening: string; periodInflow: string; periodOutflow: string; closing: string; current: string }; currency: "UZS" | "USD" }) {
+/** KPI chip — deliberately smaller/denser than the hero cash card so the
+ * page has real visual hierarchy instead of N equal-weight boxes. */
+function KpiChip({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <p className="text-2xl font-semibold tabular-nums">
-          <MoneyText value={cash.current} currency={currency} />
-        </p>
-        <p className="text-xs text-muted-foreground">Текущий остаток</p>
-        <dl className="grid grid-cols-2 gap-y-1 pt-2 text-xs">
-          <dt className="text-muted-foreground">На начало периода</dt>
-          <dd className="text-right">{formatMoney(cash.opening, currency)}</dd>
-          <dt className="text-muted-foreground">Приход за период</dt>
-          <dd className="text-right text-success">{formatMoney(cash.periodInflow, currency)}</dd>
-          <dt className="text-muted-foreground">Расход за период</dt>
-          <dd className="text-right text-destructive">{formatMoney(cash.periodOutflow, currency)}</dd>
-          <dt className="text-muted-foreground">На конец периода</dt>
-          <dd className="text-right font-medium">{formatMoney(cash.closing, currency)}</dd>
-        </dl>
-      </CardContent>
-    </Card>
+    <div className="rounded-lg border bg-card px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm font-semibold tabular-nums">{value}</p>
+      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+    </div>
   );
 }
 
@@ -59,7 +49,8 @@ export default function AnalyticsPage() {
   const [dateFrom, setDateFrom] = useState(firstOfMonth());
   const [dateTo, setDateTo] = useState(todayBusinessDate());
   // Picked dates are inclusive from the user's perspective; the backend's
-  // dateTo is exclusive — see toExclusiveEndDate's doc comment.
+  // dateTo is exclusive — see toExclusiveEndDate's doc comment. Unchanged
+  // from the previous version of this page — already correct.
   const filters = {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo ? toExclusiveEndDate(dateTo) : undefined,
@@ -114,100 +105,156 @@ export default function AnalyticsPage() {
   );
 }
 
+const flowChartConfig = {
+  value: { label: "Сумма" },
+} satisfies ChartConfig;
+
 function SummaryTab({ filters }: { filters: { dateFrom?: string; dateTo?: string } }) {
   const { data, isLoading, isError, error, refetch } = useAnalyticsSummary(filters);
+  const combinedCash = useCombinedCash();
 
   if (isLoading) return <Skeleton className="h-96 w-full rounded-lg" />;
   if (isError || !data) return <ErrorState error={error} onRetry={() => refetch()} />;
 
-  const maxCategory = Math.max(1, ...data.expensesByCategory.map((c) => Number(c.amountUzs) || 0));
+  const flowData = [
+    { name: "Приход", value: Number(data.cashUzs.periodInflow), fill: "var(--color-success)" },
+    { name: "Расход", value: Number(data.cashUzs.periodOutflow), fill: "var(--color-destructive)" },
+  ];
+  const hasFlowData = flowData.some((d) => d.value > 0);
+  const net = new Decimal(data.cashUzs.periodInflow).minus(data.cashUzs.periodOutflow);
+
+  const totalExpenses = data.expensesByCategory.reduce((sum, c) => sum + (Number(c.amountUzs) || 0), 0);
+  const categoryData = data.expensesByCategory
+    .map((c) => ({ name: c.categoryName, value: Number(c.amountUzs) || 0 }))
+    .sort((a, b) => b.value - a.value);
+
+  const usdAsUzs = combinedCash.rate ? new Decimal(combinedCash.usdCash).times(combinedCash.rate) : null;
+  const compositionDataRaw = usdAsUzs
+    ? [
+        { name: "UZS", value: Number(combinedCash.uzsCash), fill: "var(--color-primary)" },
+        { name: "USD → UZS", value: usdAsUzs.toNumber(), fill: "var(--color-warning)" },
+      ]
+    : null;
+  const compositionData =
+    compositionDataRaw && compositionDataRaw.some((d) => d.value > 0) ? compositionDataRaw : null;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <CashCard title="Касса, сум" cash={data.cashUzs} currency="UZS" />
-        <CashCard title="Касса, USD" cash={data.cashUsd} currency="USD" />
+      {/* Hero */}
+      <CombinedCashCard />
+
+      {/* Secondary KPI strip — deliberately smaller than the hero above */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <KpiChip label="Закупки" value={formatMoney(data.purchasesTotalUzs, "UZS")} sub={`${data.purchasesCount} шт.`} />
+        <KpiChip label="Зарплаты" value={formatMoney(data.salariesUzs, "UZS")} />
+        <KpiChip
+          label="Долг поставщикам"
+          value={data.supplierDebtAsOf.length ? data.supplierDebtAsOf.map((d) => formatMoney(d.amount, d.currency)).join(" · ") : "Нет"}
+        />
+        <KpiChip
+          label="Доступный аванс"
+          value={data.supplierAdvancesAvailableAsOf.length ? data.supplierAdvancesAvailableAsOf.map((d) => formatMoney(d.amount, d.currency)).join(" · ") : "Нет"}
+        />
+        <KpiChip label="Склад сейчас" value={formatMoney(data.currentInventoryValueUzs, "UZS")} />
+        <KpiChip label="Склад на конец периода" value={formatMoney(data.inventoryValueAsOfUzs, "UZS")} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Card>
-          <CardContent className="space-y-1 pt-4">
-            <p className="text-xs font-medium text-muted-foreground">Закупки</p>
-            <p className="text-lg font-semibold tabular-nums">{formatMoney(data.purchasesTotalUzs, "UZS")}</p>
-            <p className="text-xs text-muted-foreground">{data.purchasesCount} шт.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 pt-4">
-            <p className="text-xs font-medium text-muted-foreground">Зарплаты</p>
-            <p className="text-lg font-semibold tabular-nums">{formatMoney(data.salariesUzs, "UZS")}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 pt-4">
-            <p className="text-xs font-medium text-muted-foreground">Долг поставщикам</p>
-            {data.supplierDebtAsOf.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Нет</p>
-            ) : (
-              data.supplierDebtAsOf.map((d) => (
-                <p key={d.currency} className="text-sm font-medium tabular-nums">
-                  <MoneyText value={d.amount} currency={d.currency} />
-                </p>
-              ))
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="space-y-1 pt-4">
-            <p className="text-xs font-medium text-muted-foreground">Доступный аванс</p>
-            {data.supplierAdvancesAvailableAsOf.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Нет</p>
-            ) : (
-              data.supplierAdvancesAvailableAsOf.map((d) => (
-                <p key={d.currency} className="text-sm font-medium tabular-nums">
-                  <MoneyText value={d.amount} currency={d.currency} />
-                </p>
-              ))
-            )}
-          </CardContent>
-        </Card>
-        <Card className="col-span-2">
-          <CardContent className="flex items-center justify-between pt-4">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Стоимость склада сейчас</p>
-              <p className="text-lg font-semibold tabular-nums">{formatMoney(data.currentInventoryValueUzs, "UZS")}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs font-medium text-muted-foreground">На конец периода</p>
-              <p className="text-sm tabular-nums text-muted-foreground">{formatMoney(data.inventoryValueAsOfUzs, "UZS")}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div>
-        <h2 className="mb-2 text-sm font-medium text-muted-foreground">Расходы по категориям</h2>
-        {data.expensesByCategory.length === 0 ? (
-          <EmptyState icon={BarChart3} title="Расходов за период нет" />
-        ) : (
-          <div className="space-y-3 rounded-lg border bg-card p-4">
-            {data.expensesByCategory.map((cat) => (
-              <div key={cat.categoryId} className="space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="truncate">{cat.categoryName}</span>
-                  <span className="shrink-0 font-medium tabular-nums">{formatMoney(cat.amountUzs, "UZS")}</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${Math.max(2, (Number(cat.amountUzs) / maxCategory) * 100)}%` }}
+      {/* Income vs Expenses */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Приход и расход за период</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hasFlowData ? (
+            <>
+              <ChartContainer config={flowChartConfig} className="aspect-auto h-40 w-full">
+                <BarChart data={flowData} layout="vertical" margin={{ left: 8, right: 8 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                  <XAxis type="number" tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={70} />
+                  <ChartTooltip
+                    content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />}
                   />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                  <Bar dataKey="value" radius={4}>
+                    {flowData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+              <p className={`mt-2 text-right text-sm font-medium ${net.isNegative() ? "text-destructive" : "text-success"}`}>
+                Итого: {net.isNegative() ? "−" : "+"}{formatMoney(net.abs().toString(), "UZS")}
+              </p>
+            </>
+          ) : (
+            <EmptyState icon={BarChart3} title="Операций за период нет" />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Cash composition */}
+      {compositionData && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Состав общей кассы</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={flowChartConfig} className="aspect-auto h-32 w-full">
+              <BarChart data={compositionData} layout="vertical" margin={{ left: 8, right: 8 }}>
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                <XAxis type="number" tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} />
+                <ChartTooltip
+                  content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />}
+                />
+                <Bar dataKey="value" radius={4}>
+                  {compositionData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+            <p className="mt-1 text-xs text-muted-foreground">
+              USD переведён в сум по курсу: 1 USD = {formatMoney(combinedCash.rate, "UZS")}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Expenses by category */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Расходы по категориям</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {categoryData.length === 0 ? (
+            <EmptyState icon={BarChart3} title="Расходов за период нет" />
+          ) : (
+            <ChartContainer
+              config={flowChartConfig}
+              className="aspect-auto w-full"
+              style={{ height: Math.max(120, categoryData.length * 36) }}
+            >
+              <BarChart data={categoryData} layout="vertical" margin={{ left: 8, right: 8 }}>
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                <XAxis type="number" tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={110} />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value) => {
+                        const pct = totalExpenses > 0 ? ((Number(value) / totalExpenses) * 100).toFixed(1) : "0";
+                        return `${formatMoney(String(value), "UZS")} (${pct}%)`;
+                      }}
+                    />
+                  }
+                />
+                <Bar dataKey="value" fill="var(--color-primary)" radius={4} />
+              </BarChart>
+            </ChartContainer>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -219,6 +266,14 @@ function MaterialsTab({ filters }: { filters: { dateFrom?: string; dateTo?: stri
     ...filters,
     materialId: materialId === "ALL" ? undefined : materialId,
   });
+
+  const topByCost = useMemo(() => {
+    if (!data) return [];
+    return [...data.materials]
+      .map((m) => ({ name: m.materialName, value: Number(m.purchasedValueUzs) || 0 }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+  }, [data]);
 
   return (
     <div className="space-y-3">
@@ -242,25 +297,49 @@ function MaterialsTab({ filters }: { filters: { dateFrom?: string; dateTo?: stri
         <EmptyState icon={BarChart3} title="Данных за период нет" />
       )}
       {!isLoading && !isError && data && data.materials.length > 0 && (
-        <div className="divide-y overflow-hidden rounded-lg border bg-card">
-          {data.materials.map((row) => (
-            <div key={row.materialId} className="space-y-1 px-4 py-3">
-              <p className="text-sm font-medium">{row.materialName}</p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <p className="text-muted-foreground">Закуплено</p>
-                  <p className="tabular-nums">{formatQuantity(row.purchasedQuantity)}</p>
-                  <p className="tabular-nums text-muted-foreground">{formatMoney(row.purchasedValueUzs, "UZS")}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Списано</p>
-                  <p className="tabular-nums">{formatQuantity(row.consumedQuantity)}</p>
-                  <p className="tabular-nums text-muted-foreground">{formatMoney(row.consumedValueUzs, "UZS")}</p>
+        <>
+          {materialId === "ALL" && topByCost.length > 1 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Самые затратные материалы</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={flowChartConfig}
+                  className="aspect-auto w-full"
+                  style={{ height: Math.max(120, topByCost.length * 32) }}
+                >
+                  <BarChart data={topByCost} layout="vertical" margin={{ left: 8, right: 8 }}>
+                    <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                    <XAxis type="number" tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />} />
+                    <Bar dataKey="value" fill="var(--color-primary)" radius={4} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          )}
+          <div className="divide-y overflow-hidden rounded-lg border bg-card">
+            {data.materials.map((row) => (
+              <div key={row.materialId} className="space-y-1 px-4 py-3">
+                <p className="text-sm font-medium">{row.materialName}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Закуплено</p>
+                    <p className="tabular-nums">{formatQuantity(row.purchasedQuantity)}</p>
+                    <p className="tabular-nums text-muted-foreground">{formatMoney(row.purchasedValueUzs, "UZS")}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Списано</p>
+                    <p className="tabular-nums">{formatQuantity(row.consumedQuantity)}</p>
+                    <p className="tabular-nums text-muted-foreground">{formatMoney(row.consumedValueUzs, "UZS")}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -276,6 +355,17 @@ function ConstructionTab({ filters }: { filters: { dateFrom?: string; dateTo?: s
     blockId: blockId === "ALL" ? undefined : blockId,
     floorId: floorId === "ALL" ? undefined : floorId,
   });
+
+  const byBlock = useMemo(() => {
+    if (!data) return [];
+    const map = new Map<string, { blockId: string; blockName: string; value: number }>();
+    for (const row of data.rows) {
+      const entry = map.get(row.blockId) ?? { blockId: row.blockId, blockName: row.blockName, value: 0 };
+      entry.value += Number(row.valueUzs) || 0;
+      map.set(row.blockId, entry);
+    }
+    return Array.from(map.values()).sort((a, b) => b.value - a.value);
+  }, [data]);
 
   const grouped = useMemo(() => {
     if (!data) return [];
@@ -325,26 +415,58 @@ function ConstructionTab({ filters }: { filters: { dateFrom?: string; dateTo?: s
         <EmptyState icon={BarChart3} title="Данных за период нет" />
       )}
       {!isLoading && !isError && grouped.length > 0 && (
-        <div className="space-y-3">
-          {grouped.map((group) => (
-            <div key={`${group.blockName}:${group.floorLabel}`} className="overflow-hidden rounded-lg border bg-card">
-              <p className="border-b bg-muted/40 px-4 py-2 text-sm font-medium">
-                {group.blockName} / {group.floorLabel}
-              </p>
-              <div className="divide-y">
-                {group.rows.map((row) => (
-                  <div key={row.materialId} className="flex items-center justify-between px-4 py-2 text-sm">
-                    <span className="truncate">{row.materialName}</span>
-                    <div className="text-right">
-                      <p className="tabular-nums">{formatQuantity(row.quantity)}</p>
-                      <p className="text-xs tabular-nums text-muted-foreground">{formatMoney(row.valueUzs, "UZS")}</p>
+        <>
+          {blockId === "ALL" && byBlock.length > 1 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Расход материалов по блокам (нажмите, чтобы отфильтровать)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={flowChartConfig}
+                  className="aspect-auto w-full"
+                  style={{ height: Math.max(120, byBlock.length * 36) }}
+                >
+                  <BarChart data={byBlock} layout="vertical" margin={{ left: 8, right: 8 }}>
+                    <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                    <XAxis type="number" tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="blockName" tick={{ fontSize: 12 }} width={90} />
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />} />
+                    <Bar
+                      dataKey="value"
+                      fill="var(--color-primary)"
+                      radius={4}
+                      onClick={(entry) => setBlockId((entry as unknown as { blockId: string }).blockId)}
+                      className="cursor-pointer"
+                    />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          )}
+          <div className="space-y-3">
+            {grouped.map((group) => (
+              <div key={`${group.blockName}:${group.floorLabel}`} className="overflow-hidden rounded-lg border bg-card">
+                <p className="border-b bg-muted/40 px-4 py-2 text-sm font-medium">
+                  {group.blockName} / {group.floorLabel}
+                </p>
+                <div className="divide-y">
+                  {group.rows.map((row) => (
+                    <div key={row.materialId} className="flex items-center justify-between px-4 py-2 text-sm">
+                      <span className="truncate">{row.materialName}</span>
+                      <div className="text-right">
+                        <p className="tabular-nums">{formatQuantity(row.quantity)}</p>
+                        <p className="text-xs tabular-nums text-muted-foreground">{formatMoney(row.valueUzs, "UZS")}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

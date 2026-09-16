@@ -28,6 +28,7 @@ const ERROR_MESSAGES_RU: Record<string, string> = {
   ATTACHMENT_LINKED: "Прикреплённый файл нельзя удалить.",
   INTERNAL_ERROR: "Произошла ошибка на сервере. Попробуйте ещё раз.",
   NETWORK_ERROR: "Нет соединения с сервером. Проверьте интернет.",
+  INVALID_CURRENT_PASSWORD: "Неверный текущий пароль.",
 };
 
 const GENERIC_MESSAGE = "Что-то пошло не так. Попробуйте ещё раз.";

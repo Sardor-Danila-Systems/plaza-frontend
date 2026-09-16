@@ -111,7 +111,7 @@ export default function DashboardPage() {
       {canMutate && (
         <div>
           <h2 className="mb-3 text-sm font-medium text-muted-foreground">Быстрые действия</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
             {QUICK_ACTIONS.map((action) => (
               <Link
                 key={action.href}

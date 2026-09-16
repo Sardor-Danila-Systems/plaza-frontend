@@ -48,6 +48,7 @@ export function useAuth() {
   const user = useAuthStore((s) => s.user);
   const status = useAuthStore((s) => s.status);
   const setSession = useAuthStore((s) => s.setSession);
+  const setUser = useAuthStore((s) => s.setUser);
   const clear = useAuthStore((s) => s.clear);
   const router = useRouter();
 
@@ -68,5 +69,12 @@ export function useAuth() {
         router.replace("/login");
       }
     },
+    updateProfile: async (displayName: string) => {
+      const updated = await authApi.updateMe(displayName);
+      setUser(updated);
+      return updated;
+    },
+    changePassword: (currentPassword: string, newPassword: string) =>
+      authApi.changePassword(currentPassword, newPassword),
   };
 }

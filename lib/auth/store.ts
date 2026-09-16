@@ -9,6 +9,7 @@ interface AuthState {
   status: AuthStatus;
   setSession: (accessToken: string, user: SafeUser) => void;
   setAccessToken: (accessToken: string) => void;
+  setUser: (user: SafeUser) => void;
   setStatus: (status: AuthStatus) => void;
   clear: () => void;
 }
@@ -22,6 +23,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   status: "idle",
   setSession: (accessToken, user) => set({ accessToken, user, status: "authenticated" }),
   setAccessToken: (accessToken) => set({ accessToken }),
+  setUser: (user) => set({ user }),
   setStatus: (status) => set({ status }),
   clear: () => set({ accessToken: null, user: null, status: "unauthenticated" }),
 }));

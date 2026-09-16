@@ -17,4 +17,16 @@ export const authApi = {
       skipAuthRetry: true,
       csrf: true,
     }),
+
+  updateMe: (displayName: string) =>
+    apiFetch<SafeUser>("/auth/me", {
+      method: "PATCH",
+      body: { displayName },
+    }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    apiFetch<void>("/auth/change-password", {
+      method: "POST",
+      body: { currentPassword, newPassword },
+    }),
 };

@@ -13,10 +13,12 @@ import {
   MoreHorizontal,
   ArrowDownCircle,
   ArrowUpCircle,
+  Banknote,
   HandCoins,
   BarChart3,
   ScrollText,
   FileSpreadsheet,
+  UserCircle,
 } from "lucide-react";
 
 export interface NavItem {
@@ -40,6 +42,7 @@ export const SECTIONS: NavItem[] = [
   { href: "/audit", label: "Аудит", icon: ScrollText },
   { href: "/reports", label: "Отчёты", icon: FileSpreadsheet },
   { href: "/settings/construction", label: "Объекты", icon: Settings },
+  { href: "/profile", label: "Профиль", icon: UserCircle },
 ];
 
 /** The 5-item mobile bottom nav — a subset of SECTIONS plus the quick-action "+". */
@@ -58,6 +61,7 @@ export interface QuickAction {
 export const QUICK_ACTIONS: QuickAction[] = [
   { href: "/finance/new?type=INCOME", label: "Доход", icon: ArrowDownCircle },
   { href: "/finance/new?type=EXPENSE", label: "Расход", icon: ArrowUpCircle },
+  { href: "/finance/new?type=SALARY", label: "Зарплата", icon: Banknote },
   { href: "/purchases/new", label: "Закупка", icon: ShoppingCart },
   { href: "/write-offs/new", label: "Списание", icon: ClipboardMinus },
   { href: "/suppliers?action=debt-payment", label: "Оплата поставщику", icon: HandCoins },

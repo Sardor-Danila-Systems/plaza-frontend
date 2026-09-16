@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Browser } from "@playwright/test";
+import { test, expect, type Page, type Browser, type APIRequestContext } from "@playwright/test";
 
 /**
  * End-to-end coverage of the primary demo lifecycle against a REAL running
@@ -31,6 +31,27 @@ async function selectByLabelId(page: Page, labelId: string, optionName: string |
   await page.locator(`button[aria-labelledby="${labelId}"]`).click();
   const exact = typeof optionName === "string";
   await page.getByRole("option", { name: optionName, exact }).click();
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+
+/** Guarantees at least one USD currency rate exists so the "Курс из
+ * списка" (referenced-rate) Select has a real option to test — talks to
+ * the backend directly (not through the browser) since no UI exists to
+ * add a rate, only to consume one. Ignored if one already exists for
+ * today (unique-per-day constraint). */
+async function ensureUsdRate(request: APIRequestContext) {
+  const loginRes = await request.post(`${API_URL}/auth/login`, {
+    data: { email: MANAGER.email, password: MANAGER.password },
+  });
+  const { accessToken, user } = await loginRes.json();
+  if (!user.projectId) return;
+  await request
+    .post(`${API_URL}/projects/${user.projectId}/currency-rates`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      data: { currency: "USD", rateUzs: "12450.00000000", effectiveOn: new Date().toISOString().slice(0, 10) },
+    })
+    .catch(() => {});
 }
 
 test.describe("auth", () => {
@@ -300,8 +321,8 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     await login(page, MANAGER);
     await page.goto("/analytics");
     await expect(page.getByText("Этот месяц")).toBeVisible();
-    // Cash card must show a real computed balance, not a stuck loading/error state.
-    await expect(page.locator("text=Касса, сум").locator("..")).toBeVisible();
+    // Combined cash hero must show a real computed balance, not a stuck loading/error state.
+    await expect(page.getByText("Общая касса")).toBeVisible();
     await expect(page.getByText(/\d[\d\s]*,\d\d\s*сум/).first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -334,5 +355,221 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     ).toBeVisible({ timeout: 10000 });
     // Never the raw backend code/message.
     await expect(page.getByText("PURCHASE_HAS_DEPENDENT_MOVEMENTS")).toHaveCount(0);
+  });
+});
+
+test.describe("login password visibility", () => {
+  test("eye icon toggles input type and preserves the typed value", async ({ page }) => {
+    await page.goto("/login");
+    const passwordInput = page.locator("#password");
+    await passwordInput.fill("correct-horse-battery");
+    await expect(passwordInput).toHaveAttribute("type", "password");
+
+    await page.getByRole("button", { name: "Показать пароль" }).click();
+    await expect(passwordInput).toHaveAttribute("type", "text");
+    await expect(passwordInput).toHaveValue("correct-horse-battery");
+
+    await page.getByRole("button", { name: "Скрыть пароль" }).click();
+    await expect(passwordInput).toHaveAttribute("type", "password");
+    await expect(passwordInput).toHaveValue("correct-horse-battery");
+  });
+});
+
+test.describe("quick-action routing regression", () => {
+  // Regression guard for the exact reported sequence: opening the FAB and
+  // picking a different operation type while /finance/new is already the
+  // mounted route must switch tabs and reset fields every time — not just
+  // on the first open, and not only when the in-page Tabs are clicked
+  // directly (that path always worked; only FAB -> FAB re-navigation
+  // exposed the bug — see app/(protected)/finance/new/page.tsx).
+  test("FAB Доход -> Расход -> Зарплата -> Доход always opens the matching tab with fields reset", async ({
+    page,
+  }) => {
+    await login(page, MANAGER);
+    await page.goto("/dashboard");
+
+    async function openViaFab(label: string) {
+      await page.locator('button[aria-label="Новая операция"]').click();
+      await page.getByRole("button", { name: label, exact: true }).click();
+    }
+
+    await openViaFab("Доход");
+    await expect(page).toHaveURL(/type=INCOME/);
+    await expect(page.getByRole("tab", { name: "Доход" })).toHaveAttribute("data-state", "active");
+    await page.fill("#amount", "12345");
+
+    await openViaFab("Расход");
+    await expect(page).toHaveURL(/type=EXPENSE/);
+    await expect(page.getByRole("tab", { name: "Расход" })).toHaveAttribute("data-state", "active");
+    await expect(page.locator("#amount")).toHaveValue("");
+    await page.fill("#amount", "999");
+
+    await openViaFab("Зарплата");
+    await expect(page).toHaveURL(/type=SALARY/);
+    await expect(page.getByRole("tab", { name: "Зарплата" })).toHaveAttribute("data-state", "active");
+    await expect(page.locator("#amount")).toHaveValue("");
+
+    await openViaFab("Доход");
+    await expect(page).toHaveURL(/type=INCOME/);
+    await expect(page.getByRole("tab", { name: "Доход" })).toHaveAttribute("data-state", "active");
+    await expect(page.locator("#amount")).toHaveValue("");
+  });
+});
+
+test.describe("exchange-rate select (vaul drawer)", () => {
+  test("referenced-rate dropdown opens and an option is selectable inside the mobile advance drawer; manual entry still works", async ({
+    page,
+    request,
+  }) => {
+    await ensureUsdRate(request);
+    await login(page, MANAGER);
+
+    const suffix = Date.now().toString().slice(-6);
+    const supplierName = `Playwright Rate Supplier ${suffix}`;
+    await page.goto("/suppliers");
+    await page.click('button:has-text("Добавить")');
+    await page.fill("#supplier-name", supplierName);
+    await page.locator("form button[type=submit]").click();
+    await page.waitForTimeout(600);
+    await page.click(`text=${supplierName}`);
+    await page.waitForURL(/\/suppliers\/[a-f0-9-]+$/);
+
+    await page.click('button:has-text("Аванс")');
+    await page.locator('button[aria-label="Валюта"]').click();
+    await page.getByRole("option", { name: "USD", exact: true }).click();
+
+    // The bug: this Select visually looked like a dropdown, but its
+    // options weren't clickable because vaul's drawer-drag recognizer
+    // intercepted the pointer. Regression guard: open it and click a real
+    // option (data-vaul-no-drag fix in components/ui/select.tsx).
+    await page.getByText("Выберите курс", { exact: true }).click();
+    await page.getByRole("option").first().click();
+    await expect(page.getByText("Выберите курс", { exact: true })).toHaveCount(0);
+
+    // Manual entry remains available as an explicit alternative.
+    await page.getByText("Свой курс", { exact: true }).click();
+    const manualRateInput = page.getByPlaceholder("Курс, сум за 1 USD");
+    await manualRateInput.fill("12500");
+    await page.getByPlaceholder("Причина ручного ввода курса").fill("Playwright manual rate check");
+    await expect(manualRateInput).toHaveValue("12500");
+  });
+});
+
+test.describe("combined cash view", () => {
+  test("shows a UZS/USD toggle and a computed total or an explicit manual-rate prompt, never a stuck blank state", async ({
+    page,
+    request,
+  }) => {
+    await ensureUsdRate(request);
+    await login(page, MANAGER);
+    await page.goto("/finance");
+
+    await expect(page.getByText("Общая касса")).toBeVisible();
+    await expect(page.getByText(/По курсу: 1 USD =|Курс USD\/UZS ещё не задан/)).toBeVisible({ timeout: 10000 });
+
+    const usdToggle = page.getByRole("button", { name: "USD", exact: true }).first();
+    await usdToggle.click();
+    await expect(page.getByText("$").first()).toBeVisible();
+  });
+});
+
+test.describe("analytics resilience", () => {
+  test("a period with zero transactions renders an explicit empty state, never a fabricated axis or crash", async ({
+    page,
+  }) => {
+    await login(page, MANAGER);
+    await page.goto("/analytics");
+    await page.fill("#analytics-date-from", "2000-01-01");
+    await page.fill("#analytics-date-to", "2000-01-02");
+    await expect(page.getByText(/Application error|Cannot read propert/i)).toHaveCount(0);
+    await expect(page.getByText("Операций за период нет")).toBeVisible({ timeout: 10000 });
+  });
+
+  test("a populated period renders the chart sections with real data", async ({ page }) => {
+    await login(page, MANAGER);
+    await page.goto("/analytics");
+    await page.click('button:has-text("Этот месяц")');
+    await expect(page.getByText("Приход и расход за период")).toBeVisible();
+    await expect(page.getByText("Расходы по категориям")).toBeVisible();
+  });
+});
+
+test.describe("profile settings", () => {
+  test("name updates, persists after reload, and role/project are never an editable control", async ({ page }) => {
+    await login(page, MANAGER);
+    await page.goto("/profile");
+
+    const nameInput = page.locator("#profile-name");
+    const original = await nameInput.inputValue();
+    const updated = `${original} (pw-test)`;
+
+    await nameInput.fill(updated);
+    await page.locator('form:has(#profile-name) button[type=submit]').click();
+    await expect(page.getByText("Имя обновлено")).toBeVisible({ timeout: 10000 });
+    await page.reload();
+    await expect(page.locator("#profile-name")).toHaveValue(updated);
+
+    // Role/project are read-only <dd> text — no select/combobox for them.
+    await expect(page.getByText("Роль", { exact: true })).toBeVisible();
+    await expect(page.locator("[role=combobox]")).toHaveCount(0);
+    await expect(page.locator("select")).toHaveCount(0);
+
+    // Revert so the display name stays stable across runs.
+    await nameInput.fill(original);
+    await page.locator('form:has(#profile-name) button[type=submit]').click();
+    await expect(page.getByText("Имя обновлено")).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe("profile password change", () => {
+  test.describe.configure({ mode: "serial" });
+  const tempPassword = "TempPlaywright#2026";
+  let page: Page;
+
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
+    page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test("wrong current password is rejected with the mapped message, never the raw backend code", async () => {
+    await login(page, ACCOUNTANT);
+    await page.goto("/profile");
+    await page.fill("#current-password", "definitely-wrong");
+    await page.fill("#new-password", tempPassword);
+    await page.fill("#confirm-password", tempPassword);
+    await page.locator('button:has-text("Сменить пароль")').click();
+    await expect(page.getByText("Неверный текущий пароль.")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("INVALID_CURRENT_PASSWORD")).toHaveCount(0);
+  });
+
+  test("a correct change succeeds, the new password logs in, and it is reverted for future runs", async () => {
+    await page.fill("#current-password", ACCOUNTANT.password);
+    await page.fill("#new-password", tempPassword);
+    await page.fill("#confirm-password", tempPassword);
+    await page.locator('button:has-text("Сменить пароль")').click();
+    await expect(page.getByText("Пароль изменён. Другие устройства вышли из системы.")).toBeVisible({
+      timeout: 10000,
+    });
+
+    await page.getByRole("button", { name: "Выйти" }).click();
+    await page.waitForURL(/\/login$/);
+    await login(page, { email: ACCOUNTANT.email, password: tempPassword });
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+    // Revert so the seeded credential stays stable for other tests / reruns.
+    await page.goto("/profile");
+    await page.fill("#current-password", tempPassword);
+    await page.fill("#new-password", ACCOUNTANT.password);
+    await page.fill("#confirm-password", ACCOUNTANT.password);
+    await page.locator('button:has-text("Сменить пароль")').click();
+    await expect(page.getByText("Пароль изменён. Другие устройства вышли из системы.")).toBeVisible({
+      timeout: 10000,
+    });
+    await page.getByRole("button", { name: "Выйти" }).click();
+    await page.waitForURL(/\/login$/);
+    await login(page, ACCOUNTANT);
   });
 });

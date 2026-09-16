@@ -48,6 +48,22 @@ export function previewSum(values: string[]): string {
   }
 }
 
+/** Abbreviated form for chart axis labels only (e.g. "12,5 млн") — the
+ * exact figure always still appears in the tooltip via formatMoney. Uses
+ * plain Number since this is a purely cosmetic axis tick, not an
+ * accounting value. */
+export function formatMoneyAbbrev(value: number, currency: "UZS" | "USD"): string {
+  const abs = Math.abs(value);
+  const suffix = currency === "USD" ? "$" : "";
+  const sub = currency === "UZS" ? " сум" : "";
+  let formatted: string;
+  if (abs >= 1_000_000_000) formatted = `${(value / 1_000_000_000).toFixed(1)} млрд`;
+  else if (abs >= 1_000_000) formatted = `${(value / 1_000_000).toFixed(1)} млн`;
+  else if (abs >= 1_000) formatted = `${(value / 1_000).toFixed(0)} тыс`;
+  else formatted = value.toFixed(0);
+  return currency === "USD" ? `${suffix}${formatted}` : `${formatted}${sub}`;
+}
+
 export function isPositiveDecimalString(value: string): boolean {
   try {
     return new Decimal(value).greaterThan(0);
