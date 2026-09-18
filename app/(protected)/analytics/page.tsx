@@ -203,7 +203,11 @@ function SummaryTab({
   const { data: purchasesInPeriod } = usePurchases({
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
-    pageSize: 200,
+    // Backend caps pageSize at 100 (ListPurchasesFilters) — a higher value
+    // fails validation with a 400 on every analytics load. The supplier-
+    // spending chart below is a best-effort aggregate of the most recent
+    // purchases in the period, not a guaranteed-complete one.
+    pageSize: 100,
   });
 
   const supplierSpending = useMemo(() => {
