@@ -7,6 +7,7 @@ import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { MoneyText } from "@/components/shared/money-text";
+import { PageHeader } from "@/components/shared/page-header";
 import { History } from "lucide-react";
 import { useFinanceList } from "@/lib/query/hooks/use-finance";
 import { usePurchases } from "@/lib/query/hooks/use-purchases";
@@ -15,10 +16,21 @@ import { useTransfers } from "@/lib/query/hooks/use-transfers";
 import { formatBusinessDate } from "@/lib/format/date";
 import { formatQuantity } from "@/lib/format/decimal";
 
+const TYPE_LABELS: Record<string, string> = {
+  INCOME: "Доход",
+  EXPENSE: "Расход",
+  SALARY: "Зарплата",
+  PURCHASE: "Закупка",
+  ADVANCE: "Аванс",
+  DEBT_PAYMENT: "Оплата долга",
+  REFUND: "Возврат",
+  ADJUSTMENT: "Корректировка",
+};
+
 export default function HistoryPage() {
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">История</h1>
+      <PageHeader title="История" />
       <Tabs defaultValue="finance">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="finance">Касса</TabsTrigger>
@@ -56,7 +68,7 @@ function FinanceHistory() {
           <DataListRow onClick={() => {}}>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {tx.type}
+                {TYPE_LABELS[tx.type] ?? tx.type}
                 {tx.cancelledAt ? " (отменено)" : ""}
               </p>
               <p className="text-xs text-muted-foreground">{formatBusinessDate(tx.occurredAt)}</p>

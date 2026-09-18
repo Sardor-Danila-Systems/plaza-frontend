@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Users, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/shared/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -26,15 +27,17 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Поставщики</h1>
-        {canMutate && (
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" />
-            Добавить
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Поставщики"
+        actions={
+          canMutate && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" />
+              Добавить
+            </Button>
+          )
+        }
+      />
 
       {isLoading && <Skeleton className="h-64 w-full rounded-lg" />}
       {isError && <ErrorState error={error} onRetry={() => refetch()} />}

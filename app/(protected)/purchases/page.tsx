@@ -7,6 +7,7 @@ import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { MoneyText } from "@/components/shared/money-text";
+import { PageHeader } from "@/components/shared/page-header";
 import { PurchaseStatusBadge } from "@/components/shared/status-badge";
 import { usePurchases } from "@/lib/query/hooks/use-purchases";
 import { formatBusinessDate } from "@/lib/format/date";
@@ -16,7 +17,7 @@ export default function PurchasesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Закупки</h1>
+      <PageHeader title="Закупки" />
 
       {isLoading && <Skeleton className="h-64 w-full rounded-lg" />}
       {isError && <ErrorState error={error} onRetry={() => refetch()} />}

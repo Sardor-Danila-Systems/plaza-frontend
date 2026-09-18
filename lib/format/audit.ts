@@ -23,6 +23,7 @@ const ENTITY_LABELS: Record<string, string> = {
   TransactionCategory: "Категория операций",
   CurrencyRate: "Курс валюты",
   Unit: "Единица измерения",
+  SettlementAllocation: "Погашение долга",
 };
 
 const ACTION_VERBS: Record<string, string> = {
@@ -35,6 +36,18 @@ const ACTION_VERBS: Record<string, string> = {
   remove: "Удаление",
 };
 
+/** A handful of actions don't fit the `<entity>.<verb>` pattern above (the
+ * settlement-effect and comment-edit events use their own compound kind as
+ * the suffix) — listed explicitly here rather than guessed at. */
+const ACTION_OVERRIDES: Record<string, string> = {
+  "purchase.cash_payment": "Оплата наличными по закупке",
+  "purchase.advance_consumption": "Списание аванса по закупке",
+  "purchase.settlement_reversed": "Отмена оплаты по закупке",
+  "purchase.comment_edit": "Изменение комментария к закупке",
+  "financial_transaction.comment_edit": "Изменение комментария к операции",
+  "debt_payment.create": "Оплата долга поставщику",
+};
+
 function splitPascalCase(value: string): string {
   return value.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
@@ -44,6 +57,7 @@ export function humanizeEntityType(entityType: string): string {
 }
 
 export function humanizeAction(action: string, entityType: string): string {
+  if (ACTION_OVERRIDES[action]) return ACTION_OVERRIDES[action];
   const verb = action.includes(".") ? action.split(".").pop()! : action;
   const label = ACTION_VERBS[verb];
   return label ? `${label}: ${humanizeEntityType(entityType)}` : action;

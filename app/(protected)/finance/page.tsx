@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { MoneyText } from "@/components/shared/money-text";
 import { CombinedCashCard } from "@/components/shared/combined-cash-card";
+import { PageHeader } from "@/components/shared/page-header";
 import { useFinanceBalance, useFinanceList } from "@/lib/query/hooks/use-finance";
 import { formatBusinessDate } from "@/lib/format/date";
 import type { FinancialTransactionType } from "@/lib/api/types";
@@ -42,9 +43,7 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Касса</h1>
-      </div>
+      <PageHeader title="Касса" />
 
       <CombinedCashCard />
 

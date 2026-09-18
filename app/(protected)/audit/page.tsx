@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { PageHeader } from "@/components/shared/page-header";
 import { useAuditLog } from "@/lib/query/hooks/use-audit";
 import { formatDateTime, toExclusiveEndDate } from "@/lib/format/date";
 import { humanizeAction } from "@/lib/format/audit";
@@ -33,7 +34,7 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Аудит</h1>
+      <PageHeader title="Аудит" />
 
       <div className="space-y-3 rounded-lg border p-3">
         <div className="grid grid-cols-2 gap-2">

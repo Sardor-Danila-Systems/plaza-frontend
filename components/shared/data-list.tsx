@@ -5,7 +5,7 @@ import { cn } from "cn";
  * desktop-only table that would need its own separate markup. */
 export function DataList({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("divide-y overflow-hidden rounded-lg border bg-card", className)}>
+    <div className={cn("divide-y divide-border overflow-hidden rounded-lg border border-border bg-card", className)}>
       {children}
     </div>
   );
@@ -25,7 +25,7 @@ export function DataListRow({
       onClick={onClick}
       className={cn(
         "flex items-center gap-3 px-4 py-3 transition-colors",
-        onClick && "cursor-pointer hover:bg-muted/60 active:bg-muted",
+        onClick && "cursor-pointer hover:bg-muted/50 active:bg-muted",
         className,
       )}
     >

@@ -6,6 +6,7 @@ import { Download, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/shared/page-header";
 import { reportsApi, REPORTS_WITH_PERIOD_FILTER, type ReportKey } from "@/lib/api/reports";
 import { saveBlob } from "@/lib/download";
 import { getErrorMessage } from "@/lib/errors/map";
@@ -46,7 +47,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Отчёты</h1>
+      <PageHeader title="Отчёты" />
 
       <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
         <div className="space-y-1.5">

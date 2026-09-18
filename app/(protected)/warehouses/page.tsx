@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/shared/page-header";
 import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -26,15 +27,17 @@ export default function WarehousesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Склады</h1>
-        {canMutate && (
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" />
-            Добавить
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Склады"
+        actions={
+          canMutate && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" />
+              Добавить
+            </Button>
+          )
+        }
+      />
 
       {isLoading && <Skeleton className="h-64 w-full rounded-lg" />}
       {isError && <ErrorState error={error} onRetry={() => refetch()} />}

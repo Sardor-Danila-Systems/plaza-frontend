@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/shared/password-input";
+import { PageHeader } from "@/components/shared/page-header";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useProject } from "@/lib/project/project-context";
 import { getErrorMessage } from "@/lib/errors/map";
@@ -24,7 +25,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-4 pb-24">
-      <h1 className="text-xl font-semibold">Профиль</h1>
+      <PageHeader title="Профиль" />
 
       <Card>
         <CardHeader>

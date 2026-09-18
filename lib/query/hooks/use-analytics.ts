@@ -3,12 +3,12 @@ import { analyticsApi, type AnalyticsPeriodFilters } from "@/lib/api/analytics";
 import { qk } from "@/lib/query/keys";
 import { useProject } from "@/lib/project/project-context";
 
-export function useAnalyticsSummary(filters: AnalyticsPeriodFilters) {
+export function useAnalyticsSummary(filters: AnalyticsPeriodFilters, options?: { enabled?: boolean }) {
   const { projectId } = useProject();
   return useQuery({
     queryKey: qk.analytics.summary(projectId!, filters),
     queryFn: () => analyticsApi.summary(projectId!, filters),
-    enabled: !!projectId,
+    enabled: !!projectId && (options?.enabled ?? true),
   });
 }
 

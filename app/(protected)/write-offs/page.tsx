@@ -7,6 +7,7 @@ import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { MoneyText } from "@/components/shared/money-text";
+import { PageHeader } from "@/components/shared/page-header";
 import { useWriteOffs } from "@/lib/query/hooks/use-write-offs";
 import { formatBusinessDate } from "@/lib/format/date";
 import { formatQuantity } from "@/lib/format/decimal";
@@ -16,7 +17,7 @@ export default function WriteOffsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Списания</h1>
+      <PageHeader title="Списания" />
 
       {isLoading && <Skeleton className="h-64 w-full rounded-lg" />}
       {isError && <ErrorState error={error} onRetry={() => refetch()} />}

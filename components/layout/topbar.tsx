@@ -5,6 +5,7 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ProjectSwitcher } from "@/components/layout/project-switcher";
+import { CommandPalette } from "@/components/layout/command-palette";
 import { useAuth } from "@/lib/auth/auth-provider";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -24,7 +25,12 @@ export function Topbar() {
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur md:h-16 md:px-6">
-      <ProjectSwitcher />
+      <div className="md:hidden">
+        <ProjectSwitcher />
+      </div>
+      <div className="hidden flex-1 justify-center md:flex">
+        <CommandPalette />
+      </div>
       <div className="ml-auto flex items-center gap-3">
         <Link href="/profile" className="flex items-center gap-3">
           <div className="hidden text-right md:block">

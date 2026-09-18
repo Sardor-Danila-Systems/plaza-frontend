@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { PageHeader } from "@/components/shared/page-header";
 import { useTransfers } from "@/lib/query/hooks/use-transfers";
 import { formatBusinessDate } from "@/lib/format/date";
 import { formatQuantity } from "@/lib/format/decimal";
@@ -15,7 +16,7 @@ export default function TransfersPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Перемещения</h1>
+      <PageHeader title="Перемещения" />
 
       {isLoading && <Skeleton className="h-64 w-full rounded-lg" />}
       {isError && <ErrorState error={error} onRetry={() => refetch()} />}

@@ -29,7 +29,7 @@ export function ProjectSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="h-9 justify-between gap-2 px-3">
+        <Button variant="outline" className="h-9 w-full justify-between gap-2 px-3">
           <span className="flex items-center gap-2 truncate">
             <Building2 className="size-4 text-muted-foreground" />
             <span className="truncate max-w-36">{project?.name ?? "Выберите проект"}</span>

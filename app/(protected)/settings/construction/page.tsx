@@ -11,6 +11,7 @@ import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
+import { PageHeader } from "@/components/shared/page-header";
 import { useBlocks, useFloors, useCreateBlock, useCreateFloor } from "@/lib/query/hooks/use-construction";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
@@ -25,15 +26,17 @@ export default function ConstructionSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Объекты</h1>
-        {canMutate && (
-          <Button size="sm" onClick={() => setCreateBlockOpen(true)}>
-            <Plus className="size-4" />
-            Блок
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Объекты"
+        actions={
+          canMutate && (
+            <Button size="sm" onClick={() => setCreateBlockOpen(true)}>
+              <Plus className="size-4" />
+              Блок
+            </Button>
+          )
+        }
+      />
 
       {isLoading && <Skeleton className="h-64 w-full rounded-lg" />}
       {isError && <ErrorState error={error} onRetry={() => refetch()} />}

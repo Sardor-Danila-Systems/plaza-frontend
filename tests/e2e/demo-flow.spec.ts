@@ -321,8 +321,8 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     await login(page, MANAGER);
     await page.goto("/analytics");
     await expect(page.getByText("Этот месяц")).toBeVisible();
-    // Combined cash hero must show a real computed balance, not a stuck loading/error state.
-    await expect(page.getByText("Общая касса")).toBeVisible();
+    // KPI row must show a real computed balance, not a stuck loading/error state.
+    await expect(page.getByRole("tabpanel", { name: "Сводка" }).getByText("Касса", { exact: true })).toBeVisible();
     await expect(page.getByText(/\d[\d\s]*,\d\d\s*сум/).first()).toBeVisible({ timeout: 10000 });
   });
 
