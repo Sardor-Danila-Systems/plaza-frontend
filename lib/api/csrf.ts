@@ -22,9 +22,7 @@
  * deliberate — "neither cookie is ever sent on ordinary business API
  * requests." This bridge remains required.
  */
-export async function readCsrfToken(): Promise<string | null> {
-  if (typeof document === "undefined") return null;
-
+function loadCsrfBridge(): Promise<string | null> {
   return new Promise((resolve) => {
     const iframe = document.createElement("iframe");
     iframe.style.display = "none";
@@ -34,13 +32,7 @@ export async function readCsrfToken(): Promise<string | null> {
       iframe.remove();
     };
 
-    const timeout = setTimeout(() => {
-      cleanup();
-      resolve(null);
-    }, 5000);
-
     iframe.onload = () => {
-      clearTimeout(timeout);
       try {
         const cookie = iframe.contentDocument?.cookie ?? "";
         const match = cookie.match(/(?:^|; )csrf_token=([^;]*)/);
@@ -54,4 +46,22 @@ export async function readCsrfToken(): Promise<string | null> {
 
     document.body.appendChild(iframe);
   });
+}
+
+/**
+ * Wrapped in a hard `Promise.race` against an independent timeout: relying
+ * solely on `loadCsrfBridge`'s own internal `setTimeout`/`onload` sequencing
+ * left a real gap where, if `onload` never fired and the internal timeout
+ * didn't fire either (e.g. background-tab timer throttling), this promise
+ * never settled — which left `AuthProvider`'s bootstrap stuck on
+ * "Загрузка…" forever on first load. This guarantees a resolution no matter
+ * what the bridge iframe does.
+ */
+export async function readCsrfToken(): Promise<string | null> {
+  if (typeof document === "undefined") return null;
+
+  return Promise.race([
+    loadCsrfBridge(),
+    new Promise<string | null>((resolve) => setTimeout(() => resolve(null), 5000)),
+  ]);
 }

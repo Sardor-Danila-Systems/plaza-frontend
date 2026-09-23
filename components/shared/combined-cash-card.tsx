@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { useCombinedCash } from "@/lib/query/hooks/use-combined-cash";
+import { useCreateCurrencyRate } from "@/lib/query/hooks/use-finance";
 import { formatMoney } from "@/lib/format/decimal";
 import { cn } from "cn";
 import type { Currency } from "@/lib/api/types";
@@ -17,9 +19,21 @@ import type { Currency } from "@/lib/api/types";
  * at. The rate used for this display is always shown next to the total.
  */
 export function CombinedCashCard() {
-  const { uzsCash, usdCash, rate, rateSource, totalUzs, totalUsd, isLoading, manualRate, setManualRate } =
-    useCombinedCash();
+  const {
+    uzsCash,
+    usdCash,
+    rate,
+    rateSource,
+    liveAsOf,
+    liveStale,
+    totalUzs,
+    totalUsd,
+    isLoading,
+    manualRate,
+    setManualRate,
+  } = useCombinedCash();
   const [unit, setUnit] = useState<Currency>("UZS");
+  const createRate = useCreateCurrencyRate();
 
   if (isLoading) {
     return (
@@ -59,10 +73,35 @@ export function CombinedCashCard() {
             <p className="text-3xl font-semibold tabular-nums">
               {unit === "UZS" ? formatMoney(totalUzs, "UZS") : formatMoney(totalUsd, "USD")}
             </p>
-            <p className="text-xs text-muted-foreground">
-              По курсу: 1 USD = {formatMoney(rate, "UZS")}
-              {rateSource === "manual" && " (введён вручную для отображения)"}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                По курсу: 1 USD = {formatMoney(rate, "UZS")}
+                {rateSource === "manual" && " (введён вручную для отображения)"}
+                {rateSource === "live" &&
+                  (liveStale
+                    ? ` (курс ЦБ РУз устарел, последний известный на ${liveAsOf})`
+                    : ` (официальный курс ЦБ РУз на ${liveAsOf})`)}
+              </p>
+              {rateSource === "live" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  disabled={createRate.isPending}
+                  onClick={() =>
+                    createRate.mutate({
+                      currency: "USD",
+                      rateUzs: rate,
+                      effectiveOn: liveAsOf ?? new Date().toISOString().slice(0, 10),
+                      source: "PROVIDER",
+                    })
+                  }
+                >
+                  {createRate.isPending ? "Сохранение…" : "Сохранить как курс проекта"}
+                </Button>
+              )}
+            </div>
           </>
         ) : (
           <div className="space-y-2">
@@ -74,13 +113,13 @@ export function CombinedCashCard() {
               <Label htmlFor="combined-cash-manual-rate" className="text-xs">
                 Курс, сум за 1 USD
               </Label>
-              <Input
+              <DecimalInput
                 id="combined-cash-manual-rate"
-                inputMode="decimal"
+                scale={2}
                 className="h-10 max-w-48"
                 placeholder="12500"
                 value={manualRate}
-                onChange={(e) => setManualRate(e.target.value)}
+                onValueChange={setManualRate}
               />
             </div>
           </div>

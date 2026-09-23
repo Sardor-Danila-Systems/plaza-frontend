@@ -1,22 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Decimal from "decimal.js";
-import { useFinanceBalance, useCurrencyRates } from "@/lib/query/hooks/use-finance";
+import { useFinanceBalance, useCurrencyRates, useLiveCurrencyRate } from "@/lib/query/hooks/use-finance";
 
 export interface CombinedCash {
   uzsCash: string;
   usdCash: string;
   /** The USD/UZS rate actually used for the combined figures below, or
-   * null if none is available yet (no recorded rate and no manual entry). */
+   * null if none is available yet (no recorded rate, no live rate, and no
+   * manual entry). */
   rate: string | null;
-  rateSource: "recent" | "manual" | null;
+  rateSource: "recent" | "live" | "manual" | null;
+  /** Set when rateSource is "live": the official quote date and whether it
+   * came from cache after a failed refetch. */
+  liveAsOf: string | null;
+  liveStale: boolean;
   totalUzs: string | null;
   totalUsd: string | null;
   isLoading: boolean;
   /** Session-local only — never persisted, never sent to the backend.
    * Purely confirms which rate this DISPLAY calculation uses when no
-   * recorded rate exists yet. */
+   * recorded or live rate exists yet. Debounced before it affects `rate`
+   * so typing doesn't recompute on every keystroke. */
   manualRate: string;
   setManualRate: (value: string) => void;
+}
+
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timeout);
+  }, [value, delayMs]);
+  return debounced;
 }
 
 /**
@@ -29,7 +44,9 @@ export interface CombinedCash {
 export function useCombinedCash(): CombinedCash {
   const { data: balance, isLoading: balanceLoading } = useFinanceBalance();
   const { data: rates, isLoading: ratesLoading } = useCurrencyRates();
+  const { data: liveRate, isLoading: liveLoading } = useLiveCurrencyRate();
   const [manualRate, setManualRate] = useState("");
+  const debouncedManualRate = useDebounced(manualRate, 300);
 
   const uzsCash = balance?.uzs ?? "0";
   const usdCash = balance?.usd ?? "0";
@@ -40,12 +57,18 @@ export function useCombinedCash(): CombinedCash {
   // client-side sort needed.
   const recentUsdRate = rates?.find((r) => r.currency === "USD")?.rateUzs ?? null;
 
-  let rate: string | null = recentUsdRate;
-  let rateSource: "recent" | "manual" | null = recentUsdRate ? "recent" : null;
-  if (!rate && manualRate) {
+  let rate: string | null = null;
+  let rateSource: "recent" | "live" | "manual" | null = null;
+  if (recentUsdRate) {
+    rate = recentUsdRate;
+    rateSource = "recent";
+  } else if (liveRate?.rateUzs) {
+    rate = liveRate.rateUzs;
+    rateSource = "live";
+  } else if (debouncedManualRate) {
     try {
-      if (new Decimal(manualRate).isPositive()) {
-        rate = manualRate;
+      if (new Decimal(debouncedManualRate).isPositive()) {
+        rate = debouncedManualRate;
         rateSource = "manual";
       }
     } catch {
@@ -73,9 +96,14 @@ export function useCombinedCash(): CombinedCash {
     usdCash,
     rate,
     rateSource,
+    liveAsOf: rateSource === "live" ? (liveRate?.asOf ?? null) : null,
+    liveStale: rateSource === "live" ? (liveRate?.stale ?? false) : false,
     totalUzs,
     totalUsd,
-    isLoading: balanceLoading || ratesLoading,
+    // Don't block on the live-rate fetch once a recorded project rate
+    // already covers the calculation — only wait for it when it's actually
+    // the rate in use.
+    isLoading: balanceLoading || ratesLoading || (!recentUsdRate && liveLoading),
     manualRate,
     setManualRate,
   };

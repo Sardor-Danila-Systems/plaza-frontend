@@ -24,9 +24,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus("loading");
     (async () => {
       try {
-        const accessToken = await refreshAccessToken();
-        const user = await authApi.me();
-        setSession(accessToken, user);
+        // Hard upper bound on the whole bootstrap chain: without this, if
+        // refreshAccessToken()/me() ever hangs (network stall, a promise
+        // that never settles upstream), `status` stays "loading" forever
+        // and the app shows "Загрузка…" indefinitely with no way out short
+        // of a hard refresh.
+        const bootstrap = (async () => {
+          const accessToken = await refreshAccessToken();
+          const user = await authApi.me();
+          setSession(accessToken, user);
+        })();
+        const timeout = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("auth bootstrap timed out")), 8000);
+        });
+        await Promise.race([bootstrap, timeout]);
       } catch {
         clear();
       }

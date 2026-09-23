@@ -6,11 +6,19 @@ import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCreateFinanceTransaction, useFinanceCategories, useCurrencyRates } from "@/lib/query/hooks/use-finance";
+import {
+  useCreateFinanceTransaction,
+  useFinanceCategories,
+  useCurrencyRates,
+  useLiveCurrencyRate,
+  useCreateCurrencyRate,
+} from "@/lib/query/hooks/use-finance";
+import { formatMoney } from "@/lib/format/decimal";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
 import { todayBusinessDate } from "@/lib/format/date";
@@ -94,8 +102,23 @@ function FinanceForm({
 
   const { data: categories = [] } = useFinanceCategories();
   const { data: currencyRates = [] } = useCurrencyRates();
+  const { data: liveRate } = useLiveCurrencyRate();
+  const createRateMutation = useCreateCurrencyRate();
   const createMutation = useCreateFinanceTransaction();
   const { key, renew } = useIdempotencyKey();
+
+  const useLiveRateAsReference = () => {
+    if (!liveRate) return;
+    createRateMutation.mutate(
+      {
+        currency: "USD",
+        rateUzs: liveRate.rateUzs,
+        effectiveOn: liveRate.asOf,
+        source: "PROVIDER",
+      },
+      { onSuccess: (rate) => setCurrencyRateId(rate.id) },
+    );
+  };
 
   const relevantCategories = categories.filter((c) => c.kind === type && c.isActive);
 
@@ -152,12 +175,12 @@ function FinanceForm({
       <div className="space-y-2">
         <Label htmlFor="amount">Сумма</Label>
         <div className="flex gap-2">
-          <Input
+          <DecimalInput
             id="amount"
-            inputMode="decimal"
+            scale={2}
             className="h-11 flex-1"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onValueChange={setAmount}
             placeholder="0.00"
           />
           <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
@@ -182,26 +205,53 @@ function FinanceForm({
           </Tabs>
 
           {rateMode === "referenced" ? (
-            <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Выберите курс" />
-              </SelectTrigger>
-              <SelectContent>
-                {currencyRates.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.rateUzs} сум ({r.effectiveOn})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            currencyRates.length > 0 ? (
+              <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Выберите курс" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currencyRates.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.rateUzs} сум ({r.effectiveOn})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : liveRate ? (
+              <div className="space-y-2 rounded-md border border-dashed p-3">
+                <p className="text-sm text-muted-foreground">
+                  В проекте ещё нет сохранённых курсов. Актуальный официальный курс ЦБ РУз на{" "}
+                  {liveRate.asOf}: <span className="font-medium text-foreground">{formatMoney(liveRate.rateUzs, "UZS")}</span>{" "}
+                  за 1 USD.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={currencyRateId ? "secondary" : "default"}
+                  disabled={createRateMutation.isPending}
+                  onClick={useLiveRateAsReference}
+                >
+                  {currencyRateId
+                    ? "Курс использован"
+                    : createRateMutation.isPending
+                      ? "Сохранение…"
+                      : "Использовать этот курс"}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                В проекте ещё нет сохранённых курсов, а актуальный курс сейчас недоступен — введите курс вручную.
+              </p>
+            )
           ) : (
             <div className="space-y-2">
-              <Input
-                inputMode="decimal"
+              <DecimalInput
+                scale={8}
                 className="h-11"
                 placeholder="Курс, сум за 1 USD"
                 value={exchangeRate}
-                onChange={(e) => setExchangeRate(e.target.value)}
+                onValueChange={setExchangeRate}
               />
               <Textarea
                 placeholder="Причина ручного ввода курса"

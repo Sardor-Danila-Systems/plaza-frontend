@@ -6,12 +6,13 @@ import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSuppliers, useKnownAdvances } from "@/lib/query/hooks/use-suppliers";
 import { useWarehouses, useMaterials } from "@/lib/query/hooks/use-inventory";
-import { useCurrencyRates } from "@/lib/query/hooks/use-finance";
+import { useCurrencyRates, useLiveCurrencyRate, useCreateCurrencyRate } from "@/lib/query/hooks/use-finance";
 import { useCreatePurchase } from "@/lib/query/hooks/use-purchases";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
@@ -48,6 +49,21 @@ export default function NewPurchasePage() {
   const { data: warehouses = [] } = useWarehouses();
   const { data: materials = [] } = useMaterials({ isActive: true });
   const { data: currencyRates = [] } = useCurrencyRates();
+  const { data: liveRate } = useLiveCurrencyRate();
+  const createRateMutation = useCreateCurrencyRate();
+
+  const useLiveRateAsReference = () => {
+    if (!liveRate) return;
+    createRateMutation.mutate(
+      {
+        currency: "USD",
+        rateUzs: liveRate.rateUzs,
+        effectiveOn: liveRate.asOf,
+        source: "PROVIDER",
+      },
+      { onSuccess: (rate) => setCurrencyRateId(rate.id) },
+    );
+  };
   const { data: knownAdvances = [] } = useKnownAdvances(supplierId);
   const createMutation = useCreatePurchase();
   const { key, renew } = useIdempotencyKey();
@@ -224,26 +240,54 @@ export default function NewPurchasePage() {
               </button>
             </div>
             {rateMode === "referenced" ? (
-              <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Выберите курс" />
-                </SelectTrigger>
-                <SelectContent>
-                  {currencyRates.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.rateUzs} сум ({r.effectiveOn})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              currencyRates.length > 0 ? (
+                <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
+                  <SelectTrigger className="h-11 w-full">
+                    <SelectValue placeholder="Выберите курс" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencyRates.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.rateUzs} сум ({r.effectiveOn})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : liveRate ? (
+                <div className="space-y-2 rounded-md border border-dashed p-3">
+                  <p className="text-sm text-muted-foreground">
+                    В проекте ещё нет сохранённых курсов. Актуальный официальный курс ЦБ РУз на{" "}
+                    {liveRate.asOf}:{" "}
+                    <span className="font-medium text-foreground">{formatMoney(liveRate.rateUzs, "UZS")}</span> за 1
+                    USD.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={currencyRateId ? "secondary" : "default"}
+                    disabled={createRateMutation.isPending}
+                    onClick={useLiveRateAsReference}
+                  >
+                    {currencyRateId
+                      ? "Курс использован"
+                      : createRateMutation.isPending
+                        ? "Сохранение…"
+                        : "Использовать этот курс"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  В проекте ещё нет сохранённых курсов, а актуальный курс сейчас недоступен — введите курс вручную.
+                </p>
+              )
             ) : (
               <div className="space-y-2">
-                <Input
-                  inputMode="decimal"
+                <DecimalInput
+                  scale={8}
                   className="h-11"
                   placeholder="Курс, сум за 1 USD"
                   value={exchangeRate}
-                  onChange={(e) => setExchangeRate(e.target.value)}
+                  onValueChange={setExchangeRate}
                 />
                 <Textarea
                   placeholder="Причина ручного ввода курса"
@@ -289,21 +333,21 @@ export default function NewPurchasePage() {
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Input
+                <DecimalInput
                   aria-label="Количество"
-                  inputMode="decimal"
+                  scale={6}
                   placeholder="Количество"
                   className="h-11"
                   value={row.quantity}
-                  onChange={(e) => updateItem(row.key, { quantity: e.target.value })}
+                  onValueChange={(v) => updateItem(row.key, { quantity: v })}
                 />
-                <Input
+                <DecimalInput
                   aria-label="Цена за единицу"
-                  inputMode="decimal"
+                  scale={8}
                   placeholder="Цена за ед."
                   className="h-11"
                   value={row.unitPrice}
-                  onChange={(e) => updateItem(row.key, { unitPrice: e.target.value })}
+                  onValueChange={(v) => updateItem(row.key, { unitPrice: v })}
                 />
               </div>
               {row.quantity && row.unitPrice && (
@@ -336,23 +380,21 @@ export default function NewPurchasePage() {
                   </label>
                   {checked && (
                     <div className="space-y-2 pl-6">
-                      <Input
-                        inputMode="decimal"
+                      <DecimalInput
+                        scale={2}
                         placeholder="Сумма к использованию"
                         className="h-10"
                         value={advanceAmounts[advance.id] ?? ""}
-                        onChange={(e) =>
-                          setAdvanceAmounts((v) => ({ ...v, [advance.id]: e.target.value }))
-                        }
+                        onValueChange={(v) => setAdvanceAmounts((prev) => ({ ...prev, [advance.id]: v }))}
                       />
                       {needsRate && (
-                        <Input
-                          inputMode="decimal"
+                        <DecimalInput
+                          scale={8}
                           placeholder="Курс пересчёта"
                           className="h-10"
                           value={advanceSettlementRates[advance.id] ?? ""}
-                          onChange={(e) =>
-                            setAdvanceSettlementRates((v) => ({ ...v, [advance.id]: e.target.value }))
+                          onValueChange={(v) =>
+                            setAdvanceSettlementRates((prev) => ({ ...prev, [advance.id]: v }))
                           }
                         />
                       )}
@@ -366,7 +408,14 @@ export default function NewPurchasePage() {
 
         <div className="space-y-2">
           <Label htmlFor="purchase-cash-paid">Оплата наличными сейчас (необязательно)</Label>
-          <Input id="purchase-cash-paid" inputMode="decimal" className="h-11" value={cashPaid} onChange={(e) => setCashPaid(e.target.value)} placeholder="0.00" />
+          <DecimalInput
+            id="purchase-cash-paid"
+            scale={2}
+            className="h-11"
+            value={cashPaid}
+            onValueChange={setCashPaid}
+            placeholder="0.00"
+          />
         </div>
 
         <div className="space-y-2">

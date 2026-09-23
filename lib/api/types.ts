@@ -7,7 +7,7 @@ export type Role = "OWNER" | "ACCOUNTANT" | "PROJECT_MANAGER";
 
 export type Currency = "UZS" | "USD";
 
-export type RateSource = "MANUAL" | "REFERENCED" | "NOT_APPLICABLE";
+export type RateSource = "MANUAL" | "PROVIDER";
 
 export type TransactionDirection = "IN" | "OUT";
 
@@ -127,6 +127,15 @@ export interface CurrencyRate {
   source: RateSource;
   createdById: string;
   createdAt: string;
+}
+
+/** Read-only live USD/UZS quote from the Central Bank of Uzbekistan — not a
+ * persisted CurrencyRate row until the user explicitly saves one. */
+export interface LiveCurrencyRate {
+  rateUzs: string;
+  asOf: string;
+  source: "PROVIDER";
+  stale: boolean;
 }
 
 export interface FinancialTransaction {

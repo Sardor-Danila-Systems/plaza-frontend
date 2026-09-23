@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,7 @@ import {
 import { useMaterials, useInventoryBalances } from "@/lib/query/hooks/use-inventory";
 import { useBlocks, useFloors } from "@/lib/query/hooks/use-construction";
 import { usePurchases } from "@/lib/query/hooks/use-purchases";
+import { useFinanceList } from "@/lib/query/hooks/use-finance";
 import { useCombinedCash } from "@/lib/query/hooks/use-combined-cash";
 import { formatMoney, formatMoneyAbbrev, formatQuantity } from "@/lib/format/decimal";
 import { todayBusinessDate, toExclusiveEndDate } from "@/lib/format/date";
@@ -223,6 +224,29 @@ function SummaryTab({
       .slice(0, 8);
   }, [purchasesInPeriod]);
 
+  const { data: transactionsInPeriod } = useFinanceList({
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+    // Same backend cap as the purchases fetch above — best-effort trend,
+    // not a guaranteed-complete one for very busy periods.
+    pageSize: 100,
+  });
+
+  const cashTrendTxCount = transactionsInPeriod?.data.length ?? 0;
+  const cashTrendData = useMemo(() => {
+    if (!transactionsInPeriod) return [];
+    const byDay = new Map<string, number>();
+    for (const tx of transactionsInPeriod.data) {
+      if (tx.cancelledAt) continue;
+      const day = tx.occurredAt.slice(0, 10);
+      const signed = tx.direction === "IN" ? Number(tx.amountUzs) : -Number(tx.amountUzs);
+      byDay.set(day, (byDay.get(day) ?? 0) + signed);
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, net]) => ({ date: date.slice(5), net }));
+  }, [transactionsInPeriod]);
+
   if (isLoading) return <Skeleton className="h-96 w-full rounded-lg" />;
   if (isError || !data) return <ErrorState error={error} onRetry={() => refetch()} />;
 
@@ -232,6 +256,13 @@ function SummaryTab({
   ];
   const hasFlowData = flowData.some((d) => d.value > 0);
   const net = new Decimal(data.cashUzs.periodInflow).minus(data.cashUzs.periodOutflow);
+
+  const cashWaterfallData = [
+    { name: "Начало", value: Number(data.cashUzs.opening), fill: "var(--color-muted-foreground)" },
+    { name: "Приход", value: Number(data.cashUzs.periodInflow), fill: "var(--color-success)" },
+    { name: "Расход", value: Number(data.cashUzs.periodOutflow), fill: "var(--color-destructive)" },
+    { name: "Конец", value: Number(data.cashUzs.closing), fill: "var(--color-primary)" },
+  ];
 
   const totalExpenses = data.expensesByCategory.reduce((sum, c) => sum + (Number(c.amountUzs) || 0), 0);
   const categoryData = data.expensesByCategory
@@ -458,36 +489,58 @@ function SummaryTab({
         )}
       </div>
 
-      {/* Cash flow waterfall — real single-period figures (opening → in/out → closing); the backend has no daily/weekly bucketed history to plot a true trend line, so this deliberately stays a real snapshot instead of a fabricated one. */}
+      {/* Cash flow waterfall — real single-period figures (opening → in/out
+       * → closing); the backend has no daily/weekly bucketed history to
+       * plot a true trend line, so this stays a real snapshot rendered as
+       * bars rather than a fabricated one. */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">Движение денежных средств</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Начальный остаток</p>
-              <p className="text-sm font-semibold tabular-nums">{formatMoney(data.cashUzs.opening, "UZS")}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Приход</p>
-              <p className="text-sm font-semibold tabular-nums text-success">
-                +{formatMoney(data.cashUzs.periodInflow, "UZS")}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Расход</p>
-              <p className="text-sm font-semibold tabular-nums text-destructive">
-                −{formatMoney(data.cashUzs.periodOutflow, "UZS")}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Конечный остаток</p>
-              <p className="text-sm font-semibold tabular-nums">{formatMoney(data.cashUzs.closing, "UZS")}</p>
-            </div>
-          </div>
+          <ChartContainer config={flowChartConfig} className="aspect-auto h-44 w-full">
+            <BarChart data={cashWaterfallData} margin={{ left: 8, right: 8, top: 8 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} width={56} />
+              <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />} />
+              <Bar dataKey="value" radius={4}>
+                {cashWaterfallData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ChartContainer>
         </CardContent>
       </Card>
+
+      {/* Cash trend — client-side aggregation of real transactions in the
+       * period (same best-effort pattern as the supplier-spending chart
+       * below: capped at the backend's pageSize=100, so this is a trend of
+       * the most recent activity, not a guaranteed-complete one for very
+       * busy periods — disclosed explicitly rather than presented as
+       * authoritative). */}
+      {cashTrendData.length > 1 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Динамика кассы</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={flowChartConfig} className="aspect-auto h-48 w-full">
+              <LineChart data={cashTrendData} margin={{ left: 8, right: 8, top: 8 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} width={56} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />} />
+                <Line type="monotone" dataKey="net" stroke="var(--color-primary)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ChartContainer>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Чистое движение (приход − расход) по дням, по последним {cashTrendTxCount} операциям периода.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Supplier spending — aggregated client-side from real purchase records in the selected period (not a backend endpoint yet). */}
       {supplierSpending.length > 0 && (
@@ -532,6 +585,19 @@ function MaterialsTab({ filters }: { filters: { dateFrom?: string; dateTo?: stri
       .slice(0, 8);
   }, [data]);
 
+  const purchasedVsConsumed = useMemo(() => {
+    if (!data) return [];
+    return [...data.materials]
+      .map((m) => ({
+        name: m.materialName,
+        purchased: Number(m.purchasedValueUzs) || 0,
+        consumed: Number(m.consumedValueUzs) || 0,
+      }))
+      .filter((m) => m.purchased > 0 || m.consumed > 0)
+      .sort((a, b) => b.purchased - a.purchased)
+      .slice(0, 8);
+  }, [data]);
+
   return (
     <div className="space-y-3">
       <Select value={materialId} onValueChange={setMaterialId}>
@@ -572,6 +638,29 @@ function MaterialsTab({ filters }: { filters: { dateFrom?: string; dateTo?: stri
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
                     <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />} />
                     <Bar dataKey="value" fill="var(--color-primary)" radius={4} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          )}
+          {materialId === "ALL" && purchasedVsConsumed.length > 1 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Закуплено vs списано</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={flowChartConfig}
+                  className="aspect-auto w-full"
+                  style={{ height: Math.max(140, purchasedVsConsumed.length * 40) }}
+                >
+                  <BarChart data={purchasedVsConsumed} layout="vertical" margin={{ left: 8, right: 8 }}>
+                    <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                    <XAxis type="number" tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />} />
+                    <Bar dataKey="purchased" name="Закуплено" fill="var(--color-primary)" radius={4} />
+                    <Bar dataKey="consumed" name="Списано" fill="var(--color-gold)" radius={4} />
                   </BarChart>
                 </ChartContainer>
               </CardContent>

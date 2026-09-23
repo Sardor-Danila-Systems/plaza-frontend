@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Package, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -248,12 +249,12 @@ function CreateMaterialDialog({
         </div>
         <div className="space-y-2">
           <Label htmlFor="material-min-stock">Минимальный остаток (необязательно)</Label>
-          <Input
+          <DecimalInput
             id="material-min-stock"
-            inputMode="decimal"
+            scale={6}
             className="h-11"
             value={minimumStock}
-            onChange={(e) => setMinimumStock(e.target.value)}
+            onValueChange={setMinimumStock}
           />
         </div>
         <Button

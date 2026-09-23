@@ -37,7 +37,7 @@ export function Sidebar() {
     .toUpperCase();
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
+    <aside className="hidden h-full w-64 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar md:flex">
       <div className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border px-5">
         <div className="flex size-7 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
           EP

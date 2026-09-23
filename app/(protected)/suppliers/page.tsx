@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -130,7 +131,7 @@ function CreateSupplierDialog({
         </div>
         <div className="space-y-2">
           <Label htmlFor="supplier-phone">Телефон</Label>
-          <Input id="supplier-phone" className="h-11" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <PhoneInput id="supplier-phone" className="h-11" value={phone} onValueChange={setPhone} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="supplier-comment">Комментарий</Label>

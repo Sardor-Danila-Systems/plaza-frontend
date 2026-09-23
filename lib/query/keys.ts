@@ -17,6 +17,7 @@ export const qk = {
     detail: (projectId: string, id: string) => ["finance", projectId, "detail", id] as const,
     categories: (projectId: string) => ["finance", projectId, "categories"] as const,
     currencyRates: (projectId: string) => ["finance", projectId, "currency-rates"] as const,
+    liveCurrencyRate: (projectId: string) => ["finance", projectId, "currency-rates", "live"] as const,
   },
   suppliers: {
     list: (projectId: string) => ["suppliers", projectId, "list"] as const,

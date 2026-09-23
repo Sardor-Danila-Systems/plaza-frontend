@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -266,12 +267,12 @@ function AdvanceDialog({
         <div className="space-y-2">
           <Label id="advance-amount-label" htmlFor="advance-amount">Сумма</Label>
           <div className="flex gap-2">
-            <Input
+            <DecimalInput
               id="advance-amount"
-              inputMode="decimal"
+              scale={2}
               className="h-11 flex-1"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onValueChange={setAmount}
               placeholder="0.00"
             />
             <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
@@ -479,12 +480,12 @@ function DebtPaymentDialog({
         <div className="space-y-2">
           <Label htmlFor="debt-amount">Сумма оплаты</Label>
           <div className="flex gap-2">
-            <Input
+            <DecimalInput
               id="debt-amount"
-              inputMode="decimal"
+              scale={2}
               className="h-11 flex-1"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onValueChange={setAmount}
               placeholder="0.00"
             />
             <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
@@ -516,12 +517,12 @@ function DebtPaymentDialog({
         {needsSettlementRate && (
           <div className="space-y-2">
             <Label htmlFor="debt-settlement-rate">Курс закрытия долга ({selectedPurchase?.currency} за оплату)</Label>
-            <Input
+            <DecimalInput
               id="debt-settlement-rate"
-              inputMode="decimal"
+              scale={8}
               className="h-11"
               value={settlementExchangeRate}
-              onChange={(e) => setSettlementExchangeRate(e.target.value)}
+              onValueChange={setSettlementExchangeRate}
               placeholder="Например, 12500.00000000"
             />
           </div>
@@ -606,12 +607,12 @@ function RateFields({
         </Select>
       ) : (
         <div className="space-y-2">
-          <Input
-            inputMode="decimal"
+          <DecimalInput
+            scale={8}
             className="h-11"
             placeholder="Курс, сум за 1 USD"
             value={exchangeRate}
-            onChange={(e) => setExchangeRate(e.target.value)}
+            onValueChange={setExchangeRate}
           />
           <Textarea
             placeholder="Причина ручного ввода курса"

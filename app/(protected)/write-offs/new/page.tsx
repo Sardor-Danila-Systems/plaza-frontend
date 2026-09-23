@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,12 +125,12 @@ export default function NewWriteOffPage() {
 
         <div className="space-y-2">
           <Label htmlFor="writeoff-quantity">Количество{selectedBalance ? ` (доступно: ${formatQuantity(selectedBalance.quantity, selectedBalance.unitSymbol)})` : ""}</Label>
-          <Input
+          <DecimalInput
             id="writeoff-quantity"
-            inputMode="decimal"
+            scale={6}
             className="h-11"
             value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
+            onValueChange={setQuantity}
             disabled={!materialId}
           />
         </div>
