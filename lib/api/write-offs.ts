@@ -5,7 +5,9 @@ export interface CreateWriteOffInput {
   warehouseId: string;
   materialId: string;
   blockId: string;
-  floorId: string;
+  /** Omitted for material consumed by the whole block rather than one
+   * floor — see StockWriteOff.floorId in the API's schema. */
+  floorId?: string;
   quantity: string;
   comment?: string;
   occurredAt: string;

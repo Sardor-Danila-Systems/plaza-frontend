@@ -7,8 +7,8 @@ import {
   type CreateDebtPaymentInput,
 } from "@/lib/api/suppliers";
 import { qk } from "@/lib/query/keys";
+import type { Supplier } from "@/lib/api/types";
 import { useProject } from "@/lib/project/project-context";
-import { readKnownAdvances, rememberAdvance } from "@/lib/local/known-advances";
 
 export function useSuppliers() {
   const { projectId } = useProject();
@@ -42,7 +42,17 @@ export function useCreateSupplier() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateSupplierInput) => suppliersApi.create(projectId!, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["suppliers", projectId] }),
+    onSuccess: (supplier) => {
+      // Put the new row into the cached list *before* the refetch lands. A
+      // caller that selects it straight away (the purchase form's inline
+      // "+") would otherwise hold an id no <SelectItem> matches yet, and a
+      // Radix Select in that state keeps showing its placeholder even once
+      // the option appears.
+      queryClient.setQueryData<Supplier[]>(qk.suppliers.list(projectId!), (current) =>
+        current ? [...current, supplier] : [supplier],
+      );
+      queryClient.invalidateQueries({ queryKey: ["suppliers", projectId] });
+    },
   });
 }
 
@@ -69,22 +79,21 @@ export function useCreateSupplierAdvance() {
       body: CreateSupplierAdvanceInput;
       idempotencyKey: string;
     }) => suppliersApi.createAdvance(projectId!, supplierId, body, idempotencyKey),
-    onSuccess: (advance, { supplierId }) => {
-      rememberAdvance(supplierId, advance);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers", projectId] });
       queryClient.invalidateQueries({ queryKey: ["finance", projectId] });
     },
   });
 }
 
-/** See lib/local/known-advances.ts — the backend has no list endpoint for
- * advances, so this surfaces only advances created through this app. */
-export function useKnownAdvances(supplierId: string) {
+/** Every advance the supplier has, server-side — replaces the browser-local
+ * list that could only ever show advances created in that same browser. */
+export function useSupplierAdvances(supplierId: string) {
+  const { projectId } = useProject();
   return useQuery({
-    queryKey: ["suppliers", "known-advances", supplierId],
-    queryFn: () => readKnownAdvances(supplierId),
-    enabled: !!supplierId,
-    staleTime: 0,
+    queryKey: qk.suppliers.advances(projectId!, supplierId),
+    queryFn: () => suppliersApi.listAdvances(projectId!, supplierId),
+    enabled: !!projectId && !!supplierId,
   });
 }
 

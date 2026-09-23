@@ -28,7 +28,7 @@ import { useCurrencyRates } from "@/lib/query/hooks/use-finance";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
 import { formatBusinessDate, todayBusinessDate } from "@/lib/format/date";
-import { isPositiveDecimalString } from "@/lib/format/decimal";
+import { formatMoney, isPositiveDecimalString } from "@/lib/format/decimal";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
 import type { Currency } from "@/lib/api/types";
@@ -600,7 +600,7 @@ function RateFields({
           <SelectContent>
             {currencyRates.map((r) => (
               <SelectItem key={r.id} value={r.id}>
-                {r.rateUzs} сум ({r.effectiveOn})
+                {formatMoney(r.rateUzs, "UZS")} ({r.effectiveOn})
               </SelectItem>
             ))}
           </SelectContent>

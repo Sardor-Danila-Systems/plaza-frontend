@@ -10,10 +10,13 @@ import { DecimalInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSuppliers, useKnownAdvances } from "@/lib/query/hooks/use-suppliers";
+import { useSuppliers, useSupplierAdvances } from "@/lib/query/hooks/use-suppliers";
 import { useWarehouses, useMaterials } from "@/lib/query/hooks/use-inventory";
 import { useCurrencyRates, useLiveCurrencyRate, useCreateCurrencyRate } from "@/lib/query/hooks/use-finance";
 import { useCreatePurchase } from "@/lib/query/hooks/use-purchases";
+import { CreateSupplierDialog } from "@/components/shared/create-supplier-dialog";
+import { CreateWarehouseDialog } from "@/components/shared/create-warehouse-dialog";
+import { CreateMaterialDialog } from "@/components/shared/create-material-dialog";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
 import { todayBusinessDate } from "@/lib/format/date";
@@ -44,6 +47,12 @@ export default function NewPurchasePage() {
   const [comment, setComment] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayBusinessDate());
   const [formError, setFormError] = useState<string | null>(null);
+  // A purchase is frequently the moment a supplier/warehouse/material is
+  // first entered at all; creating one from here keeps a half-filled form
+  // alive instead of losing it to a trip through another section.
+  const [createSupplierOpen, setCreateSupplierOpen] = useState(false);
+  const [createWarehouseOpen, setCreateWarehouseOpen] = useState(false);
+  const [createMaterialOpen, setCreateMaterialOpen] = useState(false);
 
   const { data: suppliers = [] } = useSuppliers();
   const { data: warehouses = [] } = useWarehouses();
@@ -64,21 +73,39 @@ export default function NewPurchasePage() {
       { onSuccess: (rate) => setCurrencyRateId(rate.id) },
     );
   };
-  const { data: knownAdvances = [] } = useKnownAdvances(supplierId);
+  const { data: supplierAdvances = [] } = useSupplierAdvances(supplierId);
   const createMutation = useCreatePurchase();
   const { key, renew } = useIdempotencyKey();
 
-  const usableAdvances = knownAdvances.filter((a) => Number(a.availableAmount) > 0);
+  const usableAdvances = supplierAdvances.filter((a) => Number(a.availableAmount) > 0);
 
   const previewTotal = previewSum(
     items.map((i) => previewMultiply(i.quantity || "0", i.unitPrice || "0")),
   );
+
+  /** Drops a just-created material into the first still-empty row, or adds
+   * a row for it — so "create material" lands where the user was typing. */
+  const assignMaterialToRow = (materialId: string) =>
+    setItems((rows) => {
+      const target = rows.find((r) => !r.materialId);
+      if (target) return rows.map((r) => (r === target ? { ...r, materialId } : r));
+      return [...rows, { key: crypto.randomUUID(), materialId, quantity: "", unitPrice: "" }];
+    });
 
   const addItem = () =>
     setItems((rows) => [...rows, { key: crypto.randomUUID(), materialId: "", quantity: "", unitPrice: "" }]);
   const removeItem = (rowKey: string) => setItems((rows) => rows.filter((r) => r.key !== rowKey));
   const updateItem = (rowKey: string, patch: Partial<ItemRow>) =>
     setItems((rows) => rows.map((r) => (r.key === rowKey ? { ...r, ...patch } : r)));
+
+  /** Radix Select re-emits `onValueChange("")` when its option list changes
+   * underneath a controlled value — which happens right after a supplier,
+   * warehouse or material is created inline and the list refetches. None of
+   * these selects has a real "no value" option, so an empty value is never
+   * a user choice and clearing the field would silently undo the pick. */
+  const ignoreEmpty = (set: (value: string) => void) => (value: string) => {
+    if (value) set(value);
+  };
 
   const toggleAdvance = (advanceId: string) => {
     setSelectedAdvanceIds((ids) =>
@@ -172,39 +199,65 @@ export default function NewPurchasePage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-2">
             <Label id="purchase-supplier-label">Поставщик</Label>
-            <Select
-              value={supplierId}
-              onValueChange={(v) => {
-                setSupplierId(v);
-                setSelectedAdvanceIds([]);
-              }}
-            >
-              <SelectTrigger className="h-11 w-full" aria-labelledby="purchase-supplier-label">
-                <SelectValue placeholder="Выберите поставщика" />
-              </SelectTrigger>
-              <SelectContent>
-                {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select
+                value={supplierId}
+                onValueChange={ignoreEmpty((v) => {
+                  setSupplierId(v);
+                  setSelectedAdvanceIds([]);
+                })}
+              >
+                <SelectTrigger className="h-11 flex-1" aria-labelledby="purchase-supplier-label">
+                  <SelectValue placeholder="Выберите поставщика" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-11 shrink-0"
+                aria-label="Новый поставщик"
+                title="Новый поставщик"
+                onClick={() => setCreateSupplierOpen(true)}
+              >
+                <Plus className="size-4" />
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label id="purchase-warehouse-label">Склад поступления</Label>
-            <Select value={warehouseId} onValueChange={setWarehouseId}>
-              <SelectTrigger className="h-11 w-full" aria-labelledby="purchase-warehouse-label">
-                <SelectValue placeholder="Выберите склад" />
-              </SelectTrigger>
-              <SelectContent>
-                {warehouses.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={warehouseId} onValueChange={ignoreEmpty(setWarehouseId)}>
+                <SelectTrigger className="h-11 flex-1" aria-labelledby="purchase-warehouse-label">
+                  <SelectValue placeholder="Выберите склад" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-11 shrink-0"
+                aria-label="Новый склад"
+                title="Новый склад"
+                onClick={() => setCreateWarehouseOpen(true)}
+              >
+                <Plus className="size-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -248,7 +301,7 @@ export default function NewPurchasePage() {
                   <SelectContent>
                     {currencyRates.map((r) => (
                       <SelectItem key={r.id} value={r.id}>
-                        {r.rateUzs} сум ({r.effectiveOn})
+                        {formatMoney(r.rateUzs, "UZS")} ({r.effectiveOn})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -301,19 +354,25 @@ export default function NewPurchasePage() {
         )}
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Label id="purchase-materials-label">Материалы</Label>
-            <Button type="button" variant="outline" size="sm" onClick={addItem}>
-              <Plus className="size-3.5" />
-              Строка
-            </Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setCreateMaterialOpen(true)}>
+                <Plus className="size-3.5" />
+                Новый материал
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                <Plus className="size-3.5" />
+                Строка
+              </Button>
+            </div>
           </div>
           {items.map((row) => (
             <div key={row.key} className="space-y-2 rounded-lg border p-3">
               <div className="flex items-start gap-2">
                 <Select
                   value={row.materialId}
-                  onValueChange={(v) => updateItem(row.key, { materialId: v })}
+                  onValueChange={ignoreEmpty((v) => updateItem(row.key, { materialId: v }))}
                 >
                   <SelectTrigger className="h-11 flex-1" aria-labelledby="purchase-materials-label">
                     <SelectValue placeholder="Материал" />
@@ -446,6 +505,25 @@ export default function NewPurchasePage() {
           </Button>
         </div>
       </form>
+
+      <CreateSupplierDialog
+        open={createSupplierOpen}
+        onOpenChange={setCreateSupplierOpen}
+        onCreated={(supplier) => {
+          setSupplierId(supplier.id);
+          setSelectedAdvanceIds([]);
+        }}
+      />
+      <CreateWarehouseDialog
+        open={createWarehouseOpen}
+        onOpenChange={setCreateWarehouseOpen}
+        onCreated={(warehouse) => setWarehouseId(warehouse.id)}
+      />
+      <CreateMaterialDialog
+        open={createMaterialOpen}
+        onOpenChange={setCreateMaterialOpen}
+        onCreated={(material) => assignMaterialToRow(material.id)}
+      />
     </div>
   );
 }

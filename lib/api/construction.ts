@@ -11,6 +11,17 @@ export const constructionApi = {
       body,
     }),
 
+  /** One transaction server-side: every block and all of its floors, or
+   * nothing. See BulkBuildingBlockDto in the API. */
+  createBlocksBulk: (
+    projectId: string,
+    body: { blocks: { name: string; code: string; floorLabels?: string[] }[] },
+  ) =>
+    apiFetch<{ blocks: BuildingBlock[]; floorsCreated: number }>(
+      `/projects/${projectId}/construction/blocks/bulk`,
+      { method: "POST", body },
+    ),
+
   updateBlock: (
     projectId: string,
     blockId: string,
@@ -33,6 +44,16 @@ export const constructionApi = {
       method: "POST",
       body,
     }),
+
+  createFloorsBulk: (
+    projectId: string,
+    blockId: string,
+    body: { labels: string[]; startSortOrder?: number },
+  ) =>
+    apiFetch<Floor[]>(
+      `/projects/${projectId}/construction/blocks/${blockId}/floors/bulk`,
+      { method: "POST", body },
+    ),
 
   updateFloor: (
     projectId: string,

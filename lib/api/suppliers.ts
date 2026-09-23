@@ -62,6 +62,9 @@ export const suppliersApi = {
   ledger: (projectId: string, id: string) =>
     apiFetch<SupplierLedger>(`/projects/${projectId}/suppliers/${id}/ledger`),
 
+  listAdvances: (projectId: string, supplierId: string) =>
+    apiFetch<SupplierAdvance[]>(`/projects/${projectId}/suppliers/${supplierId}/advances`),
+
   createAdvance: (
     projectId: string,
     supplierId: string,

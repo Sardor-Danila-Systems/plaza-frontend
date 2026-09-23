@@ -5,6 +5,7 @@ import {
   type ListMaterialsFilters,
 } from "@/lib/api/inventory";
 import { qk } from "@/lib/query/keys";
+import type { Material, Warehouse } from "@/lib/api/types";
 import { useProject } from "@/lib/project/project-context";
 
 export function useWarehouses() {
@@ -31,7 +32,15 @@ export function useCreateWarehouse() {
   return useMutation({
     mutationFn: (body: { name: string; code: string; comment?: string }) =>
       inventoryApi.createWarehouse(projectId!, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inventory", projectId] }),
+    onSuccess: (warehouse) => {
+      // See useCreateSupplier — the new row has to be selectable before the
+      // refetch lands, or an inline "create and use it" flow selects an id
+      // that no option matches yet.
+      queryClient.setQueryData<Warehouse[]>(qk.inventory.warehouses(projectId!), (current) =>
+        current ? [...current, warehouse] : [warehouse],
+      );
+      queryClient.invalidateQueries({ queryKey: ["inventory", projectId] });
+    },
   });
 }
 
@@ -97,7 +106,16 @@ export function useCreateMaterial() {
       unitId: string;
       minimumStock?: string;
     }) => inventoryApi.createMaterial(projectId!, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inventory", projectId] }),
+    onSuccess: (material) => {
+      // Every cached materials list (they are keyed by filter) gets the new
+      // row appended — see useCreateSupplier. A list whose filter the new
+      // material doesn't actually match self-corrects on the refetch below.
+      queryClient.setQueriesData<Material[]>(
+        { queryKey: ["inventory", projectId, "materials"] },
+        (current) => (current ? [...current, material] : [material]),
+      );
+      queryClient.invalidateQueries({ queryKey: ["inventory", projectId] });
+    },
   });
 }
 

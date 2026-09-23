@@ -48,20 +48,24 @@ export function previewSum(values: string[]): string {
   }
 }
 
-/** Abbreviated form for chart axis labels only (e.g. "12,5 млн") — the
- * exact figure always still appears in the tooltip via formatMoney. Uses
- * plain Number since this is a purely cosmetic axis tick, not an
- * accounting value. */
-export function formatMoneyAbbrev(value: number, currency: "UZS" | "USD"): string {
+/** The scaled number alone ("12,5 млн"), with no currency word — the piece
+ * a chart can render on its own line when the full "… сум" form would not
+ * fit (e.g. a donut's centre label). Uses a comma decimal separator to
+ * match formatMoney's Russian formatting. Plain Number arithmetic is fine
+ * here: this is a cosmetic label, never an accounting value. */
+export function formatNumberAbbrev(value: number): string {
   const abs = Math.abs(value);
-  const suffix = currency === "USD" ? "$" : "";
-  const sub = currency === "UZS" ? " сум" : "";
-  let formatted: string;
-  if (abs >= 1_000_000_000) formatted = `${(value / 1_000_000_000).toFixed(1)} млрд`;
-  else if (abs >= 1_000_000) formatted = `${(value / 1_000_000).toFixed(1)} млн`;
-  else if (abs >= 1_000) formatted = `${(value / 1_000).toFixed(0)} тыс`;
-  else formatted = value.toFixed(0);
-  return currency === "USD" ? `${suffix}${formatted}` : `${formatted}${sub}`;
+  if (abs >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1).replace(".", ",")} млрд`;
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(".", ",")} млн`;
+  if (abs >= 1_000) return `${(value / 1_000).toFixed(0)} тыс`;
+  return value.toFixed(0);
+}
+
+/** Abbreviated form for chart axis labels only (e.g. "12,5 млн сум") — the
+ * exact figure always still appears in the tooltip via formatMoney. */
+export function formatMoneyAbbrev(value: number, currency: "UZS" | "USD"): string {
+  const formatted = formatNumberAbbrev(value);
+  return currency === "USD" ? `$${formatted}` : `${formatted} сум`;
 }
 
 export function isPositiveDecimalString(value: string): boolean {

@@ -30,6 +30,31 @@ export function useCreateBlock() {
   });
 }
 
+export function useCreateBlocksBulk() {
+  const { projectId } = useProject();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { blocks: { name: string; code: string; floorLabels?: string[] }[] }) =>
+      constructionApi.createBlocksBulk(projectId!, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["construction", projectId] }),
+  });
+}
+
+export function useCreateFloorsBulk() {
+  const { projectId } = useProject();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      blockId,
+      body,
+    }: {
+      blockId: string;
+      body: { labels: string[]; startSortOrder?: number };
+    }) => constructionApi.createFloorsBulk(projectId!, blockId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["construction", projectId] }),
+  });
+}
+
 export function useCreateFloor() {
   const { projectId } = useProject();
   const queryClient = useQueryClient();

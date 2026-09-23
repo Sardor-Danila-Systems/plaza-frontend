@@ -12,7 +12,6 @@ import { History } from "lucide-react";
 import { useFinanceList } from "@/lib/query/hooks/use-finance";
 import { usePurchases } from "@/lib/query/hooks/use-purchases";
 import { useWriteOffs } from "@/lib/query/hooks/use-write-offs";
-import { useTransfers } from "@/lib/query/hooks/use-transfers";
 import { formatBusinessDate } from "@/lib/format/date";
 import { formatQuantity } from "@/lib/format/decimal";
 
@@ -32,11 +31,10 @@ export default function HistoryPage() {
     <div className="space-y-4">
       <PageHeader title="История" />
       <Tabs defaultValue="finance">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="finance">Касса</TabsTrigger>
           <TabsTrigger value="purchases">Закупки</TabsTrigger>
           <TabsTrigger value="write-offs">Списания</TabsTrigger>
-          <TabsTrigger value="transfers">Перемещения</TabsTrigger>
         </TabsList>
 
         <TabsContent value="finance" className="mt-4">
@@ -47,9 +45,6 @@ export default function HistoryPage() {
         </TabsContent>
         <TabsContent value="write-offs" className="mt-4">
           <WriteOffsHistory />
-        </TabsContent>
-        <TabsContent value="transfers" className="mt-4">
-          <TransfersHistory />
         </TabsContent>
       </Tabs>
     </div>
@@ -118,28 +113,6 @@ function WriteOffsHistory() {
               <p className="text-xs text-muted-foreground">{formatBusinessDate(w.occurredAt)}</p>
             </div>
             <span className="text-sm">{formatQuantity(w.quantity)}</span>
-          </DataListRow>
-        </Link>
-      ))}
-    </DataList>
-  );
-}
-
-function TransfersHistory() {
-  const { data, isLoading, isError, error, refetch } = useTransfers({ includeCancelled: true, pageSize: 50 });
-  if (isLoading) return <Skeleton className="h-64 w-full rounded-lg" />;
-  if (isError) return <ErrorState error={error} onRetry={() => refetch()} />;
-  if (!data || data.data.length === 0) return <EmptyState icon={History} title="Перемещений пока нет" />;
-  return (
-    <DataList>
-      {data.data.map((t) => (
-        <Link key={t.id} href={`/transfers/${t.id}`}>
-          <DataListRow onClick={() => {}}>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{t.materialNameSnapshot}</p>
-              <p className="text-xs text-muted-foreground">{formatBusinessDate(t.occurredAt)}</p>
-            </div>
-            <span className="text-sm">{formatQuantity(t.quantity)}</span>
           </DataListRow>
         </Link>
       ))}

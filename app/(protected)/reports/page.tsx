@@ -20,7 +20,7 @@ const REPORTS: { key: ReportKey; label: string; description: string }[] = [
   { key: "debts", label: "Долги поставщикам", description: "Непогашенные долги" },
   { key: "advances", label: "Авансы поставщикам", description: "Выданные авансы" },
   { key: "inventory", label: "Склад", description: "Текущие остатки по материалам" },
-  { key: "movements", label: "Движения материалов", description: "Списания и перемещения за период" },
+  { key: "movements", label: "Движения материалов", description: "Все движения материалов на складах за период" },
   { key: "construction-usage", label: "Расход по объектам", description: "Расход материалов по блокам/этажам" },
 ];
 

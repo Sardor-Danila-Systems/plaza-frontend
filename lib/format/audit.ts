@@ -17,6 +17,8 @@ const ENTITY_LABELS: Record<string, string> = {
   Material: "Материал",
   MaterialCategory: "Категория материалов",
   StockWriteOff: "Списание",
+  // Kept for audit rows written before warehouse transfers were removed
+  // from the product — historical entries still carry this entityType.
   WarehouseTransfer: "Перемещение",
   BuildingBlock: "Блок",
   Floor: "Этаж",

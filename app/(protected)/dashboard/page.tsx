@@ -19,7 +19,7 @@ import { useFinanceBalance, useFinanceList } from "@/lib/query/hooks/use-finance
 import { useInventoryBalances } from "@/lib/query/hooks/use-inventory";
 import { useAnalyticsSummary } from "@/lib/query/hooks/use-analytics";
 import { useBlocks } from "@/lib/query/hooks/use-construction";
-import { formatMoney } from "@/lib/format/decimal";
+import { formatMoney, formatQuantity } from "@/lib/format/decimal";
 import { formatBusinessDate } from "@/lib/format/date";
 import { useProject } from "@/lib/project/project-context";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -181,7 +181,7 @@ export default function DashboardPage() {
                     <p className="truncate text-xs text-muted-foreground">{item.warehouseName}</p>
                   </div>
                   <span className="shrink-0 text-sm font-medium tabular-nums">
-                    {item.quantity} {item.unitSymbol}
+                    {formatQuantity(item.quantity, item.unitSymbol)}
                   </span>
                 </DataListRow>
               ))}

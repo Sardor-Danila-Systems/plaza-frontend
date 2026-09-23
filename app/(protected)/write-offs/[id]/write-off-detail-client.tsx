@@ -54,7 +54,7 @@ export function WriteOffDetailClient({ id }: { id: string }) {
 
             <dt className="text-muted-foreground">Объект</dt>
             <dd className="text-right">
-              {data.blockNameSnapshot} / {data.floorLabelSnapshot}
+              {data.blockNameSnapshot} / {data.floorLabelSnapshot ?? "весь блок"}
             </dd>
 
             <dt className="text-muted-foreground">Дата</dt>

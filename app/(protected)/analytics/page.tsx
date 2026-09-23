@@ -24,7 +24,7 @@ import { useBlocks, useFloors } from "@/lib/query/hooks/use-construction";
 import { usePurchases } from "@/lib/query/hooks/use-purchases";
 import { useFinanceList } from "@/lib/query/hooks/use-finance";
 import { useCombinedCash } from "@/lib/query/hooks/use-combined-cash";
-import { formatMoney, formatMoneyAbbrev, formatQuantity } from "@/lib/format/decimal";
+import { formatMoney, formatMoneyAbbrev, formatNumberAbbrev, formatQuantity } from "@/lib/format/decimal";
 import { todayBusinessDate, toExclusiveEndDate } from "@/lib/format/date";
 import { useProject } from "@/lib/project/project-context";
 import { BarChart3, AlertTriangle, TrendingUp, TrendingDown, Users2 } from "lucide-react";
@@ -92,7 +92,7 @@ function InsightChip({
       <Icon className={`size-4 shrink-0 ${toneClass}`} />
       <div className="min-w-0">
         <p className="truncate text-xs text-muted-foreground">{label}</p>
-        <p className={`text-sm font-semibold tabular-nums ${toneClass}`}>{value}</p>
+        <p className={`truncate text-sm font-semibold tabular-nums ${toneClass}`}>{value}</p>
       </div>
     </div>
   );
@@ -274,7 +274,7 @@ function SummaryTab({
   const compositionDataRaw = usdAsUzs
     ? [
         { name: "UZS", value: Number(combinedCash.uzsCash), fill: "var(--color-primary)" },
-        { name: "USD → UZS", value: usdAsUzs.toNumber(), fill: "var(--color-gold)" },
+        { name: "USD в сум", value: usdAsUzs.toNumber(), fill: "var(--color-gold)" },
       ]
     : null;
   const compositionData =
@@ -332,7 +332,14 @@ function SummaryTab({
           <InsightChip
             icon={Users2}
             label="Долг поставщикам"
-            value={suppliersWithDebtCount ? `${suppliersWithDebtCount} валют` : "Нет"}
+            /* The actual outstanding amounts, not a count of currencies —
+             * "1 валют" was both ungrammatical and less useful than the
+             * figure it was standing in for. */
+            value={
+              suppliersWithDebtCount
+                ? data.supplierDebtAsOf.map((d) => formatMoney(d.amount, d.currency)).join(" · ")
+                : "Нет"
+            }
             tone={suppliersWithDebtCount ? "warning" : "default"}
           />
           <InsightChip
@@ -376,7 +383,7 @@ function SummaryTab({
                   <ChartTooltip
                     content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />}
                   />
-                  <Bar dataKey="value" radius={4}>
+                  <Bar dataKey="value" radius={4} maxBarSize={36}>
                     {flowData.map((entry) => (
                       <Cell key={entry.name} fill={entry.fill} />
                     ))}
@@ -405,7 +412,7 @@ function SummaryTab({
             ) : (
               <div className="flex flex-col items-center gap-4 sm:flex-row">
                 <div className="relative shrink-0">
-                  <ChartContainer config={flowChartConfig} className="aspect-square h-40 w-40">
+                  <ChartContainer config={flowChartConfig} className="aspect-square h-44 w-44">
                     <PieChart>
                       <ChartTooltip
                         content={
@@ -417,16 +424,22 @@ function SummaryTab({
                           />
                         }
                       />
-                      <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={72} strokeWidth={2}>
+                      <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={82} strokeWidth={2}>
                         {categoryData.map((entry, i) => (
                           <Cell key={entry.name} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
                         ))}
                       </Pie>
                     </PieChart>
                   </ChartContainer>
+                  {/* Centre label lives inside the donut's hole, so it is
+                    * width-capped to just under the inner diameter (2×58px)
+                    * and split across two lines — a single
+                    * "50,0 млн сум расход" line overflowed the ring. */}
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <p className="text-base font-semibold tabular-nums">{formatMoneyAbbrev(totalExpenses, "UZS")}</p>
-                    <p className="text-xs text-muted-foreground">расход</p>
+                    <p className="max-w-[104px] truncate text-center text-[15px] font-semibold leading-tight tabular-nums">
+                      {formatNumberAbbrev(totalExpenses)}
+                    </p>
+                    <p className="text-[10px] leading-tight text-muted-foreground">сум расхода</p>
                   </div>
                 </div>
                 <div className="w-full min-w-0 flex-1 space-y-1.5">
@@ -461,11 +474,11 @@ function SummaryTab({
                 <BarChart data={compositionData} layout="vertical" margin={{ left: 8, right: 8 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" />
                   <XAxis type="number" tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={84} />
                   <ChartTooltip
                     content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />}
                   />
-                  <Bar dataKey="value" radius={4}>
+                  <Bar dataKey="value" radius={4} maxBarSize={32}>
                     {compositionData.map((entry) => (
                       <Cell key={entry.name} fill={entry.fill} />
                     ))}
@@ -502,9 +515,12 @@ function SummaryTab({
             <BarChart data={cashWaterfallData} margin={{ left: 8, right: 8, top: 8 }}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} width={56} />
+              {/* Bare numbers: with " сум" appended, every tick wrapped onto
+                * two lines inside the axis gutter and clipped. The unit is
+                * still spelled out in each tooltip via formatMoney. */}
+              <YAxis tickFormatter={formatNumberAbbrev} tick={{ fontSize: 11 }} width={64} />
               <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />} />
-              <Bar dataKey="value" radius={4}>
+              <Bar dataKey="value" radius={4} maxBarSize={56}>
                 {cashWaterfallData.map((entry) => (
                   <Cell key={entry.name} fill={entry.fill} />
                 ))}
@@ -530,7 +546,7 @@ function SummaryTab({
               <LineChart data={cashTrendData} margin={{ left: 8, right: 8, top: 8 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} width={56} />
+                <YAxis tickFormatter={formatNumberAbbrev} tick={{ fontSize: 11 }} width={64} />
                 <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />} />
                 <Line type="monotone" dataKey="net" stroke="var(--color-primary)" strokeWidth={2} dot={false} />
               </LineChart>
@@ -715,10 +731,17 @@ function ConstructionTab({ filters }: { filters: { dateFrom?: string; dateTo?: s
 
   const grouped = useMemo(() => {
     if (!data) return [];
-    const map = new Map<string, { blockName: string; floorLabel: string; rows: typeof data.rows }>();
+    const map = new Map<
+      string,
+      { key: string; blockName: string; floorLabel: string | null; rows: typeof data.rows }
+    >();
     for (const row of data.rows) {
-      const key = `${row.blockId}:${row.floorId}`;
-      if (!map.has(key)) map.set(key, { blockName: row.blockName, floorLabel: row.floorLabel, rows: [] });
+      // Keyed by ids, not names: two blocks may share a name, and a
+      // block-level row's floor label is null for all of them.
+      const key = `${row.blockId}:${row.floorId ?? "block"}`;
+      if (!map.has(key)) {
+        map.set(key, { key, blockName: row.blockName, floorLabel: row.floorLabel, rows: [] });
+      }
       map.get(key)!.rows.push(row);
     }
     return Array.from(map.values());
@@ -794,9 +817,9 @@ function ConstructionTab({ filters }: { filters: { dateFrom?: string; dateTo?: s
           )}
           <div className="space-y-3">
             {grouped.map((group) => (
-              <div key={`${group.blockName}:${group.floorLabel}`} className="overflow-hidden rounded-lg border border-border bg-card">
+              <div key={group.key} className="overflow-hidden rounded-lg border border-border bg-card">
                 <p className="border-b border-border bg-muted/40 px-4 py-2 text-sm font-medium">
-                  {group.blockName} / {group.floorLabel}
+                  {group.blockName} / {group.floorLabel ?? "весь блок"}
                 </p>
                 <div className="divide-y divide-border">
                   {group.rows.map((row) => (

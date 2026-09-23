@@ -19,6 +19,10 @@ import { todayBusinessDate } from "@/lib/format/date";
 import { formatQuantity, isPositiveDecimalString } from "@/lib/format/decimal";
 import Decimal from "decimal.js";
 
+/** Sentinel for the floor select's "whole block" choice — never sent to
+ * the server, which takes the absence of `floorId` to mean the same thing. */
+const WHOLE_BLOCK = "__whole_block__";
+
 export default function NewWriteOffPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -30,6 +34,9 @@ export default function NewWriteOffPage() {
   const [warehouseId, setWarehouseId] = useState(searchParams.get("warehouseId") ?? "");
   const [materialId, setMaterialId] = useState(searchParams.get("materialId") ?? "");
   const [blockId, setBlockId] = useState("");
+  // "" = nothing picked yet, WHOLE_BLOCK = deliberately no floor. Keeping
+  // them apart is what lets the form still insist on a choice being made
+  // while allowing "the whole block" to be one of the choices.
   const [floorId, setFloorId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [comment, setComment] = useState("");
@@ -65,7 +72,15 @@ export default function NewWriteOffPage() {
 
     createMutation.mutate(
       {
-        body: { warehouseId, materialId, blockId, floorId, quantity, comment: comment.trim() || undefined, occurredAt },
+        body: {
+          warehouseId,
+          materialId,
+          blockId,
+          ...(floorId === WHOLE_BLOCK ? {} : { floorId }),
+          quantity,
+          comment: comment.trim() || undefined,
+          occurredAt,
+        },
         idempotencyKey: key,
       },
       {
@@ -167,9 +182,13 @@ export default function NewWriteOffPage() {
             <Label id="writeoff-floor-label">Этаж</Label>
             <Select value={floorId} onValueChange={setFloorId} disabled={!blockId}>
               <SelectTrigger className="h-11 w-full" aria-labelledby="writeoff-floor-label">
-                <SelectValue placeholder="Выберите этаж" />
+                <SelectValue placeholder={blockId ? "Выберите этаж" : "Сначала выберите блок"} />
               </SelectTrigger>
               <SelectContent>
+                {/* Site-wide work (pours, façade, roofing) is consumed by
+                  * the block as a whole; pinning it to an arbitrary floor
+                  * only falsifies the per-floor analytics. */}
+                <SelectItem value={WHOLE_BLOCK}>Весь блок</SelectItem>
                 {floors.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
                     {f.label}

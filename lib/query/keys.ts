@@ -23,6 +23,7 @@ export const qk = {
     list: (projectId: string) => ["suppliers", projectId, "list"] as const,
     detail: (projectId: string, id: string) => ["suppliers", projectId, "detail", id] as const,
     ledger: (projectId: string, id: string) => ["suppliers", projectId, "ledger", id] as const,
+    advances: (projectId: string, id: string) => ["suppliers", projectId, "advances", id] as const,
   },
   inventory: {
     warehouses: (projectId: string) => ["inventory", projectId, "warehouses"] as const,
@@ -46,11 +47,6 @@ export const qk = {
       ["write-offs", projectId, "list", filters] as const,
     detail: (projectId: string, id: string) => ["write-offs", projectId, "detail", id] as const,
   },
-  transfers: {
-    list: (projectId: string, filters: object) =>
-      ["transfers", projectId, "list", filters] as const,
-    detail: (projectId: string, id: string) => ["transfers", projectId, "detail", id] as const,
-  },
   attachments: {
     list: (projectId: string, target: string, targetId: string) =>
       ["attachments", projectId, target, targetId] as const,
@@ -73,7 +69,6 @@ export const PROJECT_SCOPED_NAMESPACES = [
   "inventory",
   "purchases",
   "write-offs",
-  "transfers",
   "attachments",
   "audit",
   "analytics",

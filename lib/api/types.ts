@@ -46,7 +46,7 @@ export type PurchaseStatus =
 /**
  * NOTE: the field is `data`, not `items` — docs/frontend-integration.md
  * documents `items`, but the live backend (verified directly against all
- * four paginated endpoints: finances, purchases, write-offs, transfers)
+ * three paginated endpoints: finances, purchases, write-offs)
  * actually returns `data`. Trusting the running server over the doc here.
  */
 export interface Paginated<T> {
@@ -341,8 +341,8 @@ export interface WriteOff {
   materialNameSnapshot: string;
   blockId: string;
   blockNameSnapshot: string;
-  floorId: string;
-  floorLabelSnapshot: string;
+  floorId: string | null;
+  floorLabelSnapshot: string | null;
   quantity: string;
   unitCostUzs: string;
   totalCostUzs: string;
@@ -438,31 +438,12 @@ export interface MaterialAnalyticsRow {
 export interface ConstructionAnalyticsRow {
   blockId: string;
   blockName: string;
-  floorId: string;
-  floorLabel: string;
+  floorId: string | null;
+  /** null when the material was written off against the whole block. */
+  floorLabel: string | null;
   materialId: string;
   materialName: string;
   quantity: string;
   valueUzs: string;
 }
 
-export interface Transfer {
-  id: string;
-  projectId: string;
-  sourceWarehouseId: string;
-  sourceWarehouseNameSnapshot: string;
-  destinationWarehouseId: string;
-  destinationWarehouseNameSnapshot: string;
-  materialId: string;
-  materialNameSnapshot: string;
-  quantity: string;
-  unitCostUzs: string;
-  totalCostUzs: string;
-  comment: string | null;
-  occurredAt: string;
-  createdById: string;
-  createdAt: string;
-  cancelledAt: string | null;
-  cancellationReason: string | null;
-  cancelledById: string | null;
-}

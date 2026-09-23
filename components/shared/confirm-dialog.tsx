@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 
 /** Confirmation dialog that collects a required reason — used for every
- * cancel action (finance/purchase/write-off/transfer all require `reason`). */
+ * cancel action (finance/purchase/write-off all require `reason`). */
 export function ConfirmReasonDialog({
   open,
   onOpenChange,

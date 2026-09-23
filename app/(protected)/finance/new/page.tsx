@@ -213,7 +213,7 @@ function FinanceForm({
                 <SelectContent>
                   {currencyRates.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
-                      {r.rateUzs} сум ({r.effectiveOn})
+                      {formatMoney(r.rateUzs, "UZS")} ({r.effectiveOn})
                     </SelectItem>
                   ))}
                 </SelectContent>

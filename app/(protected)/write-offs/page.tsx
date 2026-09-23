@@ -52,7 +52,7 @@ export default function WriteOffsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{w.materialNameSnapshot}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {w.blockNameSnapshot} · {w.floorLabelSnapshot} · {formatBusinessDate(w.occurredAt)}
+                    {w.blockNameSnapshot} · {w.floorLabelSnapshot ?? "весь блок"} · {formatBusinessDate(w.occurredAt)}
                     {w.cancelledAt ? " · отменено" : ""}
                   </p>
                 </div>

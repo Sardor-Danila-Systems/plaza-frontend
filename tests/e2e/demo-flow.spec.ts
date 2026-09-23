@@ -133,11 +133,10 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
   const materialName = `Playwright Material ${suffix}`;
   const blockName = `Playwright Block ${suffix}`;
 
-  // One shared page/context for this whole serial flow: the advance-tracking
-  // workaround (lib/local/known-advances.ts) is scoped to the browser's own
-  // localStorage since the backend has no GET list-advances endpoint, so a
-  // fresh context per test would never see the advance created earlier in
-  // the same flow.
+  // One shared page/context for this whole serial flow: each test builds on
+  // the state the previous one left behind (supplier -> advance -> purchase
+  // -> write-off), and a fresh context per test would have to log in and
+  // re-derive all of it.
   let page: Page;
   let purchaseUrl = "";
 
@@ -216,7 +215,7 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     await page.getByRole("option", { name: supplierName, exact: true }).click();
     await page.getByText("Выберите склад", { exact: true }).click();
     await page.getByRole("option", { name: warehouseName, exact: true }).click();
-    await page.getByText("Материал", { exact: true }).click();
+    await page.locator('button[aria-labelledby="purchase-materials-label"]').click();
     await page.getByRole("option", { name: materialName, exact: true }).click();
     await page.getByPlaceholder("Количество").fill("50");
     await page.getByPlaceholder("Цена за ед.").fill("40000");
@@ -238,49 +237,69 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     await expect(page.getByText(materialName)).toBeVisible();
   });
 
-  test("transfer material between warehouses", async () => {
+  test("create the whole building at once: several blocks with their floors", async () => {
     await login(page, MANAGER);
-    const destWarehouse = `${warehouseName} B`;
-    await page.goto("/warehouses");
-    await page.click('button:has-text("Добавить")');
-    await page.fill("#wh-name", destWarehouse);
-    await page.fill("#wh-code", `pw-wh-b-${suffix}`);
-    await page.locator('form button:has-text("Создать")').click();
-    await page.waitForTimeout(600);
+    await page.goto("/settings/construction");
+    await page.click('button:has-text("Блоки")');
+    await page.fill("#blocks-prefix", blockName);
+    await page.fill("#blocks-count", "3");
+    await page.fill("#blocks-floor-count", "4");
+    // The preview names every block before anything is sent.
+    await expect(page.getByText(`${blockName} А, ${blockName} Б, ${blockName} В`)).toBeVisible();
+    await page.locator('button[type=submit]:has-text("Создать")').click();
 
-    await page.goto("/transfers/new");
-    await selectByLabelId(page, "source-warehouse-label", warehouseName);
-    await selectByLabelId(page, "destination-warehouse-label", destWarehouse);
-    await selectByLabelId(page, "transfer-material-label", new RegExp(materialName));
-    await page.locator("input[inputmode=decimal]").last().fill("10");
-    await page.locator('button[type=submit]:has-text("Оформить перемещение")').click();
-    await page.waitForURL(/\/transfers\/[a-f0-9-]+$/, { timeout: 15000 });
-    await expect(page.getByText(materialName)).toBeVisible();
+    // 3 blocks x 4 floors, one call.
+    await expect(page.getByText(/Создано блоков: 3, этажей: 12/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(`${blockName} В`)).toBeVisible();
+
+    // Floors are really there, numbered in order.
+    await page.getByText(`${blockName} А`).click();
+    await expect(page.getByText("Этаж 4")).toBeVisible();
+  });
+
+  test("add more floors to an existing block in one step", async () => {
+    await login(page, MANAGER);
+    await page.goto("/settings/construction");
+    await page.getByText(`${blockName} Б`).click();
+    await page.click('button:has-text("Добавить этажи")');
+    await page.fill("#floors-count", "2");
+    // Numbering continues after the four the block already has.
+    await expect(page.getByText("Этаж 5, Этаж 6")).toBeVisible();
+    await page.locator('button[type=submit]:has-text("Добавить")').click();
+    await expect(page.getByText(/Добавлено 2 этажа/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("Этаж 6")).toBeVisible();
   });
 
   test("write off material to a block/floor", async () => {
     await login(page, MANAGER);
-    await page.goto("/settings/construction");
-    await page.click('button:has-text("Блок")');
-    await page.getByLabel("Название").fill(blockName);
-    await page.getByLabel("Код (латиницей)").fill(`pw-block-${suffix}`);
-    await page.locator('button[type=submit]:has-text("Создать")').click();
-    await page.waitForTimeout(600);
-    await page.click(`text=${blockName}`);
-    await page.click('button:has-text("Добавить этаж")');
-    await page.getByLabel("Название").fill("Этаж 1");
-    await page.locator('button[type=submit]:has-text("Добавить")').click();
-    await page.waitForTimeout(600);
-
     await page.goto("/write-offs/new");
     await selectByLabelId(page, "writeoff-warehouse-label", warehouseName);
     await selectByLabelId(page, "writeoff-material-label", new RegExp(materialName));
     await page.locator("input[inputmode=decimal]").last().fill("5");
-    await selectByLabelId(page, "writeoff-block-label", blockName);
+    await selectByLabelId(page, "writeoff-block-label", `${blockName} А`);
     await selectByLabelId(page, "writeoff-floor-label", "Этаж 1");
     await page.locator('button[type=submit]:has-text("Оформить списание")').click();
     await page.waitForURL(/\/write-offs\/[a-f0-9-]+$/, { timeout: 15000 });
     await expect(page.getByText(materialName)).toBeVisible();
+    await expect(page.getByText(/Этаж 1/)).toBeVisible();
+  });
+
+  test("write off material to a whole block, with no floor at all", async () => {
+    await login(page, MANAGER);
+    await page.goto("/write-offs/new");
+    await selectByLabelId(page, "writeoff-warehouse-label", warehouseName);
+    await selectByLabelId(page, "writeoff-material-label", new RegExp(materialName));
+    await page.locator("input[inputmode=decimal]").last().fill("3");
+    await selectByLabelId(page, "writeoff-block-label", `${blockName} Б`);
+    await selectByLabelId(page, "writeoff-floor-label", "Весь блок");
+    await page.locator('button[type=submit]:has-text("Оформить списание")').click();
+    await page.waitForURL(/\/write-offs\/[a-f0-9-]+$/, { timeout: 15000 });
+    // The detail page says "весь блок" rather than showing an empty floor.
+    await expect(page.getByText(/весь блок/)).toBeVisible();
+
+    await page.goto("/analytics");
+    await page.getByRole("tab", { name: "Объекты" }).click();
+    await expect(page.getByText(new RegExp(`${blockName} Б / весь блок`))).toBeVisible({ timeout: 15000 });
   });
 
   test("every list page renders its rows without a runtime error", async () => {
@@ -290,7 +309,7 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     // with "Cannot read properties of undefined" while every other test
     // here only ever visited detail pages, so the bug went undetected.
     // This test's only job is to catch that class of mismatch again.
-    for (const path of ["/finance", "/purchases", "/write-offs", "/transfers", "/history", "/analytics", "/audit", "/reports"]) {
+    for (const path of ["/finance", "/purchases", "/write-offs", "/history", "/analytics", "/audit", "/reports"]) {
       await page.goto(path);
       await expect(page.getByText(/Application error|Cannot read propert/i)).toHaveCount(0);
       await expect(page.locator("h1")).toBeVisible();
@@ -351,10 +370,74 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     await page.getByPlaceholder("Укажите причину отмены").fill("Playwright dependency check");
     await page.locator('button:has-text("Отменить"):visible').last().click();
     await expect(
-      page.getByText("Закупку нельзя отменить: материалы уже использованы или перемещены."),
+      page.getByText("Закупку нельзя отменить: материалы уже использованы."),
     ).toBeVisible({ timeout: 10000 });
     // Never the raw backend code/message.
     await expect(page.getByText("PURCHASE_HAS_DEPENDENT_MOVEMENTS")).toHaveCount(0);
+  });
+});
+
+test.describe("creating master data from inside the purchase form", () => {
+  // A purchase is often the moment a supplier, a warehouse or a material is
+  // first entered at all. Each "+" creates the record and selects it without
+  // leaving the half-filled form.
+  test("supplier, warehouse and material can all be created inline and are auto-selected", async ({
+    page,
+  }) => {
+    const suffix = Date.now().toString().slice(-6);
+    const supplierName = `Inline Supplier ${suffix}`;
+    const warehouseName = `Inline Warehouse ${suffix}`;
+    const materialName = `Inline Material ${suffix}`;
+
+    await login(page, MANAGER);
+    await page.goto("/purchases/new");
+
+    // Typing into the form first: none of it may be lost to the dialogs.
+    await page.getByLabel("№ накладной").fill(`INV-${suffix}`);
+
+    await page.getByRole("button", { name: "Новый поставщик" }).click();
+    const supplierDlg = page.locator("[role=dialog], [data-slot=drawer-content]").last();
+    await page.fill("#supplier-name", supplierName);
+    await supplierDlg.locator("button[type=submit]").click();
+    // Assert on the Select trigger, not getByText — Radix also renders a
+    // hidden native <option> with the same text for form autofill.
+    await expect(page.locator('button[aria-labelledby="purchase-supplier-label"]')).toHaveText(
+      supplierName,
+      { timeout: 10000 },
+    );
+
+    await page.getByRole("button", { name: "Новый склад" }).click();
+    const warehouseDlg = page.locator("[role=dialog], [data-slot=drawer-content]").last();
+    // The code is transliterated from the name — never typed twice.
+    await page.fill("#wh-name", warehouseName);
+    await expect(page.locator("#wh-code")).toHaveValue(/inline-warehouse-\d+/);
+    await warehouseDlg.locator("button[type=submit]").click();
+    await expect(page.locator('button[aria-labelledby="purchase-warehouse-label"]')).toHaveText(
+      warehouseName,
+      { timeout: 10000 },
+    );
+
+    await page.getByRole("button", { name: "Новый материал" }).click();
+    const dlg = page.locator("[role=dialog], [data-slot=drawer-content]").last();
+    await dlg.getByLabel("Название").fill(materialName);
+    await expect(dlg.getByLabel("Код (латиницей)")).toHaveValue(/inline-material-\d+/);
+    await dlg.getByPlaceholder("Новая категория").fill(`Inline Category ${suffix}`);
+    await dlg.getByRole("button", { name: "Создать" }).first().click();
+    await page.waitForTimeout(400);
+    await dlg.getByText("Выберите единицу").click();
+    await page.getByRole("option").first().click();
+    await dlg.getByRole("button", { name: "Создать" }).last().click();
+    await expect(page.locator('button[aria-labelledby="purchase-materials-label"]')).toHaveText(
+      materialName,
+      { timeout: 10000 },
+    );
+
+    // All three are selected in the form, and nothing typed earlier was lost.
+    await expect(page.getByLabel("№ накладной")).toHaveValue(`INV-${suffix}`);
+    await page.getByPlaceholder("Количество").fill("10");
+    await page.getByPlaceholder("Цена за ед.").fill("1000");
+    await page.locator('button[type=submit]:has-text("Оформить закупку")').click();
+    await page.waitForURL(/\/purchases\/[a-f0-9-]+$/, { timeout: 15000 });
   });
 });
 
@@ -451,7 +534,8 @@ test.describe("exchange-rate select (vaul drawer)", () => {
     const manualRateInput = page.getByPlaceholder("Курс, сум за 1 USD");
     await manualRateInput.fill("12500");
     await page.getByPlaceholder("Причина ручного ввода курса").fill("Playwright manual rate check");
-    await expect(manualRateInput).toHaveValue("12500");
+    // DecimalInput groups digits for display; the submitted value stays raw.
+    await expect(manualRateInput).toHaveValue("12 500");
   });
 });
 
