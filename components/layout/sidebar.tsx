@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "cn";
-import { NAV_GROUP_LABELS, NAV_GROUP_ORDER, SECTIONS, QUICK_ACTIONS } from "@/lib/nav/config";
+import { NAV_GROUP_LABELS, NAV_GROUP_ORDER, SECTIONS, QUICK_ACTIONS, QUICK_ACTION_TONE_CLASSES } from "@/lib/nav/config";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
 import { Plus } from "lucide-react";
@@ -62,12 +62,15 @@ export function Sidebar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              {QUICK_ACTIONS.map((action) => (
-                <DropdownMenuItem key={action.href} onSelect={() => router.push(action.href)}>
-                  <action.icon className="size-4" />
-                  {action.label}
-                </DropdownMenuItem>
-              ))}
+              {QUICK_ACTIONS.map((action) => {
+                const tone = QUICK_ACTION_TONE_CLASSES[action.tone];
+                return (
+                  <DropdownMenuItem key={action.href} onSelect={() => router.push(action.href)}>
+                    <action.icon className={`size-4 ${tone.icon}`} />
+                    {action.label}
+                  </DropdownMenuItem>
+                );
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

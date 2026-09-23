@@ -24,7 +24,7 @@ import { formatBusinessDate } from "@/lib/format/date";
 import { useProject } from "@/lib/project/project-context";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
-import { QUICK_ACTIONS } from "@/lib/nav/config";
+import { QUICK_ACTIONS, QUICK_ACTION_TONE_CLASSES } from "@/lib/nav/config";
 
 const TYPE_LABELS: Record<string, string> = {
   INCOME: "Доход",
@@ -92,16 +92,21 @@ export default function DashboardPage() {
             Быстрые действия
           </p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            {QUICK_ACTIONS.map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="flex flex-col items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-3.5 text-center transition-colors hover:bg-muted/60"
-              >
-                <action.icon className="size-4.5 text-foreground" />
-                <span className="text-xs font-medium">{action.label}</span>
-              </Link>
-            ))}
+            {QUICK_ACTIONS.map((action) => {
+              const tone = QUICK_ACTION_TONE_CLASSES[action.tone];
+              return (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="flex flex-col items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-3.5 text-center transition-colors hover:bg-muted/60"
+                >
+                  <span className={`flex size-8 items-center justify-center rounded-full ${tone.bg}`}>
+                    <action.icon className={`size-4 ${tone.icon}`} />
+                  </span>
+                  <span className="text-xs font-medium">{action.label}</span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}
@@ -125,7 +130,11 @@ export default function DashboardPage() {
               {recent.data.map((tx) => (
                 <Link key={tx.id} href={`/finance/${tx.id}`}>
                   <DataListRow onClick={() => {}}>
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                    <div
+                      className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
+                        tx.direction === "IN" ? "bg-success/10" : "bg-destructive/10"
+                      }`}
+                    >
                       {tx.direction === "IN" ? (
                         <ArrowDownCircle className="size-4 text-success" />
                       ) : (

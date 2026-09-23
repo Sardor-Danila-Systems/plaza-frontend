@@ -8,10 +8,10 @@ const PURCHASE_STATUS_LABELS: Record<PurchaseStatus, string> = {
   CANCELLED: "Отменено",
 };
 
-const PURCHASE_STATUS_VARIANT: Record<PurchaseStatus, "default" | "secondary" | "destructive"> = {
+const PURCHASE_STATUS_VARIANT: Record<PurchaseStatus, "success" | "warning" | "destructive" | "secondary"> = {
   UNPAID: "destructive",
-  PARTIALLY_PAID: "secondary",
-  PAID: "default",
+  PARTIALLY_PAID: "warning",
+  PAID: "success",
   CANCELLED: "secondary",
 };
 

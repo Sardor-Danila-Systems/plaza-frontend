@@ -77,19 +77,42 @@ export const BOTTOM_NAV_LEFT: NavItem[] = [SECTIONS[0], SECTIONS[1]];
 export const BOTTOM_NAV_RIGHT: NavItem[] = [SECTIONS[3]];
 export const MORE_ICON = MoreHorizontal;
 
+/** Tailwind color token name (matches app/globals.css's `--color-*`
+ * tokens) used to tint a quick action's icon — a light touch of color per
+ * action type so the dashboard's action tiles read at a glance instead of
+ * all looking identically flat/grey. */
+export type QuickActionTone = "success" | "destructive" | "gold" | "chart-4" | "warning" | "chart-5";
+
 export interface QuickAction {
   href: string;
   label: string;
   icon: LucideIcon;
+  tone: QuickActionTone;
 }
 
 /** Central "+" quick actions — all are mutations, so only ever shown to
  * PROJECT_MANAGER (see lib/auth/permissions.ts). */
 export const QUICK_ACTIONS: QuickAction[] = [
-  { href: "/finance/new?type=INCOME", label: "Доход", icon: ArrowDownCircle },
-  { href: "/finance/new?type=EXPENSE", label: "Расход", icon: ArrowUpCircle },
-  { href: "/finance/new?type=SALARY", label: "Зарплата", icon: Banknote },
-  { href: "/purchases/new", label: "Закупка", icon: ShoppingCart },
-  { href: "/write-offs/new", label: "Списание", icon: ClipboardMinus },
-  { href: "/suppliers?action=debt-payment", label: "Оплата поставщику", icon: HandCoins },
+  { href: "/finance/new?type=INCOME", label: "Доход", icon: ArrowDownCircle, tone: "success" },
+  { href: "/finance/new?type=EXPENSE", label: "Расход", icon: ArrowUpCircle, tone: "destructive" },
+  { href: "/finance/new?type=SALARY", label: "Зарплата", icon: Banknote, tone: "gold" },
+  { href: "/purchases/new", label: "Закупка", icon: ShoppingCart, tone: "chart-4" },
+  { href: "/write-offs/new", label: "Списание", icon: ClipboardMinus, tone: "warning" },
+  { href: "/suppliers?action=debt-payment", label: "Оплата поставщику", icon: HandCoins, tone: "chart-5" },
 ];
+
+/** Full literal class strings (not built from template interpolation —
+ * Tailwind's static scanner needs to see the whole class name at build
+ * time, so a `bg-${tone}/10` template would silently produce no CSS).
+ * `warning` is the one tone with a dedicated contrast-safe text color
+ * (`--warning-foreground`, per the same pairing Badge/Stat already use);
+ * every other tone's own token doubles as both background tint and icon
+ * color at different opacities. */
+export const QUICK_ACTION_TONE_CLASSES: Record<QuickActionTone, { bg: string; icon: string }> = {
+  success: { bg: "bg-success/10", icon: "text-success" },
+  destructive: { bg: "bg-destructive/10", icon: "text-destructive" },
+  gold: { bg: "bg-gold/10", icon: "text-gold" },
+  "chart-4": { bg: "bg-chart-4/10", icon: "text-chart-4" },
+  "chart-5": { bg: "bg-chart-5/10", icon: "text-chart-5" },
+  warning: { bg: "bg-warning/15", icon: "text-warning-foreground" },
+};

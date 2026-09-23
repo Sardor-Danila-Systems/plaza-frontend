@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,14 @@ import Decimal from "decimal.js";
 
 export default function NewWriteOffPage() {
   const router = useRouter();
-  const [warehouseId, setWarehouseId] = useState("");
-  const [materialId, setMaterialId] = useState("");
+  const searchParams = useSearchParams();
+  // Deep-linked from a warehouse's own balance list ("Списать" next to a
+  // material) — pre-fills both selects so the common case (material just
+  // arrived at a known warehouse, write it straight off to an object) skips
+  // the two steps that used to force picking the warehouse and material
+  // again from scratch.
+  const [warehouseId, setWarehouseId] = useState(searchParams.get("warehouseId") ?? "");
+  const [materialId, setMaterialId] = useState(searchParams.get("materialId") ?? "");
   const [blockId, setBlockId] = useState("");
   const [floorId, setFloorId] = useState("");
   const [quantity, setQuantity] = useState("");

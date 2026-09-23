@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
+import Decimal from "decimal.js";
 import { toast } from "sonner";
-import { ArrowLeft, Package, Archive, ArchiveRestore } from "lucide-react";
+import { ArrowLeft, Package, Archive, ArchiveRestore, ClipboardMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -74,11 +76,16 @@ export function WarehouseDetailClient({ id }: { id: string }) {
           <DataList>
             {balances.map((b) => (
               <DataListRow key={b.id}>
+                <div
+                  className={`flex size-9 shrink-0 items-center justify-center rounded-full ${b.lowStock ? "bg-warning/15" : "bg-gold/10"}`}
+                >
+                  <Package className={`size-4 ${b.lowStock ? "text-warning-foreground" : "text-gold"}`} />
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{b.materialName}</p>
                   <p className="text-xs text-muted-foreground">
                     {formatQuantity(b.quantity, b.unitSymbol)}
-                    {b.lowStock && <span className="ml-2 text-warning">Низкий остаток</span>}
+                    {b.lowStock && <span className="ml-2 text-warning-foreground">Низкий остаток</span>}
                   </p>
                 </div>
                 <div className="text-right">
@@ -87,6 +94,20 @@ export function WarehouseDetailClient({ id }: { id: string }) {
                     ~{formatQuantity(b.averageCostUzs)} / {b.unitSymbol}
                   </p>
                 </div>
+                {canMutate && new Decimal(b.quantity).greaterThan(0) && (
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="ml-1 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Link href={`/write-offs/new?warehouseId=${id}&materialId=${b.materialId}`}>
+                      <ClipboardMinus className="size-3.5" />
+                      Списать
+                    </Link>
+                  </Button>
+                )}
               </DataListRow>
             ))}
           </DataList>
