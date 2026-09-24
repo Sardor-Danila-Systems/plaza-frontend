@@ -302,6 +302,31 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     await expect(page.getByText(new RegExp(`${blockName} Б / весь блок`))).toBeVisible({ timeout: 15000 });
   });
 
+  test("Construction analytics: \"Весь блок\" filter isolates whole-block write-offs from floor-specific ones", async () => {
+    await login(page, MANAGER);
+    await page.goto("/analytics");
+    await page.getByRole("tab", { name: "Объекты" }).click();
+    // Radix's Select trigger is a <button> but exposes role="combobox" —
+    // not the generic "button" role.
+    await page.getByRole("combobox", { name: "Блок" }).click();
+    await page.getByRole("option", { name: `${blockName} Б`, exact: true }).click();
+
+    // "Весь блок" — the new explicit filter — shows only the block's
+    // floorId=null write-off, never a floor-specific one.
+    await page.getByRole("combobox", { name: "Этаж" }).click();
+    await page.getByRole("option", { name: "Весь блок", exact: true }).click();
+    await expect(page.getByText(new RegExp(`${blockName} Б / весь блок`))).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Этаж \d/)).toHaveCount(0);
+
+    // A specific floor of the same block (nothing was ever written off
+    // there) renders the empty state instead of the whole-block row —
+    // proves the filter actually discriminates rather than "весь блок"
+    // text merely appearing somewhere on the page regardless of filter.
+    await page.getByRole("combobox", { name: "Этаж" }).click();
+    await page.getByRole("option", { name: "Этаж 1", exact: true }).click();
+    await expect(page.getByText("Данных за период нет")).toBeVisible({ timeout: 15000 });
+  });
+
   test("every list page renders its rows without a runtime error", async () => {
     // Regression guard: a prior version of these pages read a paginated
     // response's `.items` field, which doesn't exist on the live API (it

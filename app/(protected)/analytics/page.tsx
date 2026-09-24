@@ -711,11 +711,17 @@ function ConstructionTab({ filters }: { filters: { dateFrom?: string; dateTo?: s
   const [blockId, setBlockId] = useState("ALL");
   const { data: blocks = [] } = useBlocks();
   const { data: floors = [] } = useFloors(blockId === "ALL" ? null : blockId);
+  // "ALL" = no floor filter (floor-specific + whole-block rows), a real
+  // floor UUID = that floor only, "WHOLE_BLOCK" = only whole-block
+  // write-offs (floorId IS NULL) for the selected block — never a magic
+  // UUID smuggled through floorId, matching the backend's explicit
+  // wholeBlockOnly parameter.
   const [floorId, setFloorId] = useState("ALL");
   const { data, isLoading, isError, error, refetch } = useConstructionAnalytics({
     ...filters,
     blockId: blockId === "ALL" ? undefined : blockId,
-    floorId: floorId === "ALL" ? undefined : floorId,
+    floorId: floorId === "ALL" || floorId === "WHOLE_BLOCK" ? undefined : floorId,
+    wholeBlockOnly: floorId === "WHOLE_BLOCK" ? true : undefined,
   });
 
   const byBlock = useMemo(() => {
@@ -751,7 +757,7 @@ function ConstructionTab({ filters }: { filters: { dateFrom?: string; dateTo?: s
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
         <Select value={blockId} onValueChange={(v) => { setBlockId(v); setFloorId("ALL"); }}>
-          <SelectTrigger className="h-10 w-full">
+          <SelectTrigger className="h-10 w-full" aria-label="Блок">
             <SelectValue placeholder="Все блоки" />
           </SelectTrigger>
           <SelectContent>
@@ -764,11 +770,12 @@ function ConstructionTab({ filters }: { filters: { dateFrom?: string; dateTo?: s
           </SelectContent>
         </Select>
         <Select value={floorId} onValueChange={setFloorId} disabled={blockId === "ALL"}>
-          <SelectTrigger className="h-10 w-full">
+          <SelectTrigger className="h-10 w-full" aria-label="Этаж">
             <SelectValue placeholder="Все этажи" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Все этажи</SelectItem>
+            <SelectItem value="WHOLE_BLOCK">Весь блок</SelectItem>
             {floors.map((f) => (
               <SelectItem key={f.id} value={f.id}>
                 {f.label}

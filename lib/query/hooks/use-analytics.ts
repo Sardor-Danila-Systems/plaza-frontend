@@ -21,7 +21,9 @@ export function useMaterialsAnalytics(filters: AnalyticsPeriodFilters & { materi
   });
 }
 
-export function useConstructionAnalytics(filters: AnalyticsPeriodFilters & { blockId?: string; floorId?: string }) {
+export function useConstructionAnalytics(
+  filters: AnalyticsPeriodFilters & { blockId?: string; floorId?: string; wholeBlockOnly?: boolean },
+) {
   const { projectId } = useProject();
   return useQuery({
     queryKey: qk.analytics.construction(projectId!, filters),

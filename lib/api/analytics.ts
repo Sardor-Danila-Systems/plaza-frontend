@@ -18,9 +18,12 @@ export const analyticsApi = {
       { query: filters as Record<string, string | undefined> },
     ),
 
-  construction: (projectId: string, filters: AnalyticsPeriodFilters & { blockId?: string; floorId?: string }) =>
+  construction: (
+    projectId: string,
+    filters: AnalyticsPeriodFilters & { blockId?: string; floorId?: string; wholeBlockOnly?: boolean },
+  ) =>
     apiFetch<{ projectId: string; dateFrom: string | null; dateTo: string | null; rows: ConstructionAnalyticsRow[] }>(
       `/projects/${projectId}/analytics/construction`,
-      { query: filters as Record<string, string | undefined> },
+      { query: filters as Record<string, string | boolean | undefined> },
     ),
 };
