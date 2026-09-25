@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PhoneInput } from "@/components/ui/masked-input";
+import { PhoneInput, TaxIdInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
@@ -28,6 +28,7 @@ export function CreateSupplierDialog({
   const [name, setName] = useState("");
   const [contactPerson, setContactPerson] = useState("");
   const [phone, setPhone] = useState("");
+  const [taxId, setTaxId] = useState("");
   const [comment, setComment] = useState("");
   const createMutation = useCreateSupplier();
 
@@ -35,6 +36,7 @@ export function CreateSupplierDialog({
     setName("");
     setContactPerson("");
     setPhone("");
+    setTaxId("");
     setComment("");
   };
 
@@ -45,11 +47,15 @@ export function CreateSupplierDialog({
         onSubmit={(e) => {
           e.preventDefault();
           if (!name.trim()) return;
+          // The mask only accepts digits, so the one invalid state reachable
+          // here is a half-typed id — caught before the server 400s.
+          if (taxId.length > 0 && taxId.length < 9) return;
           createMutation.mutate(
             {
               name: name.trim(),
               contactPerson: contactPerson.trim() || undefined,
               phone: phone.trim() || undefined,
+              taxId: taxId || undefined,
               comment: comment.trim() || undefined,
             },
             {
@@ -82,10 +88,21 @@ export function CreateSupplierDialog({
           <PhoneInput id="supplier-phone" className="h-11" value={phone} onValueChange={setPhone} />
         </div>
         <div className="space-y-2">
+          <Label htmlFor="supplier-tax-id">ИНН</Label>
+          <TaxIdInput id="supplier-tax-id" className="h-11" value={taxId} onValueChange={setTaxId} />
+          {taxId.length > 0 && taxId.length < 9 && (
+            <p className="text-xs text-muted-foreground">ИНН состоит из 9 цифр</p>
+          )}
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="supplier-comment">Комментарий</Label>
           <Textarea id="supplier-comment" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
         </div>
-        <Button type="submit" className="h-11 w-full" disabled={!name.trim() || createMutation.isPending}>
+        <Button
+          type="submit"
+          className="h-11 w-full"
+          disabled={!name.trim() || (taxId.length > 0 && taxId.length < 9) || createMutation.isPending}
+        >
           {createMutation.isPending ? "Сохранение…" : "Добавить"}
         </Button>
       </form>

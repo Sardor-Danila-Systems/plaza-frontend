@@ -402,6 +402,98 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
   });
 });
 
+test.describe("supplier taxpayer id and search", () => {
+  test.describe.configure({ mode: "serial" });
+  const suffix = Date.now().toString().slice(-6);
+  const withTaxId = `ИНН Поставщик ${suffix}`;
+  const withoutTaxId = `Без ИНН ${suffix}`;
+  // Unique per run, and deliberately starts with a zero: these tests run
+  // against a real database that keeps everything earlier runs created, and
+  // a leading zero is exactly what a numeric column would have eaten.
+  const taxId = `0${suffix}12`;
+
+  let page: Page;
+
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
+    page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test("a supplier is created with an ИНН and shows it in the list", async () => {
+    await login(page, MANAGER);
+    await page.goto("/suppliers");
+    await page.click('button:has-text("Добавить")');
+    await page.fill("#supplier-name", withTaxId);
+    await page.fill("#supplier-tax-id", taxId);
+    await expect(page.locator("#supplier-tax-id")).toHaveValue(taxId);
+    await page.locator("[role=dialog], [data-slot=drawer-content]").last()
+      .locator("button[type=submit]").click();
+    await expect(page.getByText(`ИНН ${taxId}`)).toBeVisible({ timeout: 10000 });
+
+    await page.click('button:has-text("Добавить")');
+    await page.fill("#supplier-name", withoutTaxId);
+    await page.locator("[role=dialog], [data-slot=drawer-content]").last()
+      .locator("button[type=submit]").click();
+    await expect(page.getByText(withoutTaxId)).toBeVisible({ timeout: 10000 });
+  });
+
+  test("a partially typed ИНН blocks submit instead of reaching a 400", async () => {
+    await login(page, MANAGER);
+    await page.goto("/suppliers");
+    await page.click('button:has-text("Добавить")');
+    await page.fill("#supplier-name", `Неполный ИНН ${suffix}`);
+    // The mask drops non-digits, so four characters is all that lands.
+    await page.fill("#supplier-tax-id", "12ab34");
+    await expect(page.locator("#supplier-tax-id")).toHaveValue("1234");
+    await expect(page.getByText("ИНН состоит из 9 цифр")).toBeVisible();
+    const submit = page.locator("[role=dialog], [data-slot=drawer-content]").last()
+      .locator("button[type=submit]");
+    await expect(submit).toBeDisabled();
+  });
+
+  test("search narrows the list by name and by ИНН", async () => {
+    await login(page, MANAGER);
+    await page.goto("/suppliers");
+    const search = page.getByLabel("Поиск поставщиков");
+
+    await search.fill(taxId);
+    await expect(page.getByText(withTaxId)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(withoutTaxId)).toHaveCount(0);
+
+    await search.fill(withoutTaxId);
+    await expect(page.getByText(withoutTaxId)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(withTaxId)).toHaveCount(0);
+
+    await search.fill("совершенно точно ничего");
+    await expect(page.getByText("Поставщики не найдены")).toBeVisible({ timeout: 10000 });
+
+    await search.fill("");
+    await expect(page.getByText(withTaxId)).toBeVisible({ timeout: 10000 });
+  });
+
+  test("an existing supplier can be given an ИНН afterwards", async () => {
+    await login(page, MANAGER);
+    await page.goto("/suppliers");
+    await page.getByLabel("Поиск поставщиков").fill(withoutTaxId);
+    await page.getByText(withoutTaxId).click();
+    await page.waitForURL(/\/suppliers\/[a-f0-9-]+$/);
+
+    await page.getByRole("button", { name: "Изменить поставщика" }).click();
+    await page.fill("#edit-supplier-tax-id", "987654321");
+    await page.locator("[role=dialog], [data-slot=drawer-content]").last()
+      .locator("button[type=submit]").click();
+    await expect(page.getByText("ИНН 987654321")).toBeVisible({ timeout: 10000 });
+
+    // And the new id is immediately searchable.
+    await page.goto("/suppliers");
+    await page.getByLabel("Поиск поставщиков").fill("987654321");
+    await expect(page.getByText(withoutTaxId)).toBeVisible({ timeout: 10000 });
+  });
+});
+
 test.describe("creating master data from inside the purchase form", () => {
   // A purchase is often the moment a supplier, a warehouse or a material is
   // first entered at all. Each "+" creates the record and selects it without

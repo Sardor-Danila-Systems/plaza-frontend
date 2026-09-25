@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   suppliersApi,
   type CreateSupplierInput,
+  type ListSuppliersFilters,
   type UpdateSupplierInput,
   type CreateSupplierAdvanceInput,
   type CreateDebtPaymentInput,
@@ -10,11 +11,11 @@ import { qk } from "@/lib/query/keys";
 import type { Supplier } from "@/lib/api/types";
 import { useProject } from "@/lib/project/project-context";
 
-export function useSuppliers() {
+export function useSuppliers(filters: ListSuppliersFilters = {}) {
   const { projectId } = useProject();
   return useQuery({
-    queryKey: qk.suppliers.list(projectId!),
-    queryFn: () => suppliersApi.list(projectId!),
+    queryKey: qk.suppliers.list(projectId!, filters),
+    queryFn: () => suppliersApi.list(projectId!, filters),
     enabled: !!projectId,
   });
 }
@@ -43,13 +44,15 @@ export function useCreateSupplier() {
   return useMutation({
     mutationFn: (body: CreateSupplierInput) => suppliersApi.create(projectId!, body),
     onSuccess: (supplier) => {
-      // Put the new row into the cached list *before* the refetch lands. A
+      // Put the new row into every cached list (they are keyed by filter)
+      // *before* the refetch lands. A
       // caller that selects it straight away (the purchase form's inline
       // "+") would otherwise hold an id no <SelectItem> matches yet, and a
       // Radix Select in that state keeps showing its placeholder even once
       // the option appears.
-      queryClient.setQueryData<Supplier[]>(qk.suppliers.list(projectId!), (current) =>
-        current ? [...current, supplier] : [supplier],
+      queryClient.setQueriesData<Supplier[]>(
+        { queryKey: ["suppliers", projectId, "list"] },
+        (current) => (current ? [...current, supplier] : [supplier]),
       );
       queryClient.invalidateQueries({ queryKey: ["suppliers", projectId] });
     },

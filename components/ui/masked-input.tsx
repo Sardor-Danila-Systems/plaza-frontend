@@ -93,3 +93,40 @@ export function PhoneInput({
     />
   );
 }
+
+/** Uzbek taxpayer id (ИНН/СТИР): exactly nine digits. Unmasked, so
+ * `onValueChange` receives the bare digits the API expects — and the mask
+ * refuses anything that isn't a digit, so the field cannot reach the server
+ * in a shape it would reject. */
+export function TaxIdInput({
+  value,
+  onValueChange,
+  className,
+  placeholder = "123456789",
+  id,
+  disabled,
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  className?: string;
+  placeholder?: string;
+  id?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <IMaskInput
+      id={id}
+      type="text"
+      inputMode="numeric"
+      disabled={disabled}
+      mask="000000000"
+      value={value}
+      unmask={true}
+      onAccept={(_masked: string, mask: { unmaskedValue: string }) =>
+        onValueChange(mask.unmaskedValue)
+      }
+      placeholder={placeholder}
+      className={cn(INPUT_CLASSNAME, className)}
+    />
+  );
+}

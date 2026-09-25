@@ -11,6 +11,7 @@ export interface CreateSupplierInput {
   name: string;
   contactPerson?: string;
   phone?: string;
+  taxId?: string;
   comment?: string;
 }
 
@@ -18,7 +19,13 @@ export interface UpdateSupplierInput {
   name?: string;
   contactPerson?: string;
   phone?: string;
+  taxId?: string;
   comment?: string;
+  isActive?: boolean;
+}
+
+export interface ListSuppliersFilters {
+  search?: string;
   isActive?: boolean;
 }
 
@@ -45,7 +52,10 @@ export interface CreateDebtPaymentInput {
 }
 
 export const suppliersApi = {
-  list: (projectId: string) => apiFetch<Supplier[]>(`/projects/${projectId}/suppliers`),
+  list: (projectId: string, filters: ListSuppliersFilters = {}) =>
+    apiFetch<Supplier[]>(`/projects/${projectId}/suppliers`, {
+      query: filters as Record<string, string | boolean | undefined>,
+    }),
 
   get: (projectId: string, id: string) =>
     apiFetch<Supplier>(`/projects/${projectId}/suppliers/${id}`),

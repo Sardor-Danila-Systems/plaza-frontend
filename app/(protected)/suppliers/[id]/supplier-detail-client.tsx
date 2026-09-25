@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, HandCoins, Wallet } from "lucide-react";
+import { ArrowLeft, HandCoins, Pencil, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { DecimalInput } from "@/components/ui/masked-input";
+import { DecimalInput, PhoneInput, TaxIdInput } from "@/components/ui/masked-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,6 +23,7 @@ import {
   useSupplierLedger,
   useCreateSupplierAdvance,
   useCreateDebtPayment,
+  useUpdateSupplier,
 } from "@/lib/query/hooks/use-suppliers";
 import { useCurrencyRates } from "@/lib/query/hooks/use-finance";
 import { useIdempotencyKey } from "@/lib/idempotency";
@@ -31,7 +32,7 @@ import { formatBusinessDate, todayBusinessDate } from "@/lib/format/date";
 import { formatMoney, isPositiveDecimalString } from "@/lib/format/decimal";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
-import type { Currency } from "@/lib/api/types";
+import type { Currency, Supplier } from "@/lib/api/types";
 
 export function SupplierDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -41,6 +42,7 @@ export function SupplierDetailClient({ id }: { id: string }) {
   const { data: ledger, isLoading: ledgerLoading } = useSupplierLedger(id);
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const [debtOpen, setDebtOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   if (isLoading) return <Skeleton className="h-64 w-full rounded-lg" />;
   if (isError || !supplier) return <ErrorState error={error} onRetry={() => refetch()} />;
@@ -53,15 +55,22 @@ export function SupplierDetailClient({ id }: { id: string }) {
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="size-4" />
         </Button>
-        <h1 className="text-lg font-semibold">{supplier.name}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{supplier.name}</h1>
         {!supplier.isActive && <Badge variant="secondary">Архив</Badge>}
+        {canMutate && (
+          <Button variant="ghost" size="icon" aria-label="Изменить поставщика" onClick={() => setEditOpen(true)}>
+            <Pencil className="size-4" />
+          </Button>
+        )}
       </div>
 
-      {supplier.contactPerson || supplier.phone ? (
+      {supplier.contactPerson || supplier.phone || supplier.taxId || supplier.comment ? (
         <Card>
           <CardContent className="space-y-1 pt-4 text-sm">
             {supplier.contactPerson && <p>{supplier.contactPerson}</p>}
             {supplier.phone && <p className="text-muted-foreground">{supplier.phone}</p>}
+            {supplier.taxId && <p className="text-muted-foreground">ИНН {supplier.taxId}</p>}
+            {supplier.comment && <p className="text-muted-foreground">{supplier.comment}</p>}
           </CardContent>
         </Card>
       ) : null}
@@ -149,6 +158,14 @@ export function SupplierDetailClient({ id }: { id: string }) {
         )}
       </div>
 
+      {/* Remounted on each open so the fields always start from the
+        * supplier as it is now, not as it was when the page loaded. */}
+      <EditSupplierDialog
+        key={editOpen ? "edit-open" : "edit-closed"}
+        supplier={supplier}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
       <AdvanceDialog supplierId={id} open={advanceOpen} onOpenChange={setAdvanceOpen} />
       <DebtPaymentDialog
         supplierId={id}
@@ -157,6 +174,123 @@ export function SupplierDetailClient({ id }: { id: string }) {
         onOpenChange={setDebtOpen}
       />
     </div>
+  );
+}
+
+/** Until now a supplier could only be created, never corrected — which
+ * meant no existing supplier could be given the ИНН this release adds.
+ * Archiving lives here too, since it is the same PATCH. */
+function EditSupplierDialog({
+  supplier,
+  open,
+  onOpenChange,
+}: {
+  supplier: Supplier;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [name, setName] = useState(supplier.name);
+  const [contactPerson, setContactPerson] = useState(supplier.contactPerson ?? "");
+  const [phone, setPhone] = useState(supplier.phone ?? "");
+  const [taxId, setTaxId] = useState(supplier.taxId ?? "");
+  const [comment, setComment] = useState(supplier.comment ?? "");
+  const updateMutation = useUpdateSupplier();
+
+  const taxIdIncomplete = taxId.length > 0 && taxId.length < 9;
+
+  return (
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange} title="Изменить поставщика">
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!name.trim() || taxIdIncomplete) return;
+          updateMutation.mutate(
+            {
+              id: supplier.id,
+              body: {
+                name: name.trim(),
+                contactPerson: contactPerson.trim() || undefined,
+                phone: phone.trim() || undefined,
+                taxId: taxId || undefined,
+                comment: comment.trim() || undefined,
+              },
+            },
+            {
+              onSuccess: () => {
+                toast.success("Поставщик обновлён");
+                onOpenChange(false);
+              },
+              onError: (err) => toast.error(getErrorMessage(err)),
+            },
+          );
+        }}
+      >
+        <div className="space-y-2">
+          <Label htmlFor="edit-supplier-name">Название</Label>
+          <Input
+            id="edit-supplier-name"
+            className="h-11"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-supplier-contact">Контактное лицо</Label>
+          <Input
+            id="edit-supplier-contact"
+            className="h-11"
+            value={contactPerson}
+            onChange={(e) => setContactPerson(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-supplier-phone">Телефон</Label>
+          <PhoneInput id="edit-supplier-phone" className="h-11" value={phone} onValueChange={setPhone} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-supplier-tax-id">ИНН</Label>
+          <TaxIdInput id="edit-supplier-tax-id" className="h-11" value={taxId} onValueChange={setTaxId} />
+          {taxIdIncomplete && <p className="text-xs text-muted-foreground">ИНН состоит из 9 цифр</p>}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-supplier-comment">Комментарий</Label>
+          <Textarea
+            id="edit-supplier-comment"
+            rows={2}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+        </div>
+        <Button
+          type="submit"
+          className="h-11 w-full"
+          disabled={!name.trim() || taxIdIncomplete || updateMutation.isPending}
+        >
+          {updateMutation.isPending ? "Сохранение…" : "Сохранить"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full"
+          disabled={updateMutation.isPending}
+          onClick={() =>
+            updateMutation.mutate(
+              { id: supplier.id, body: { isActive: !supplier.isActive } },
+              {
+                onSuccess: () => {
+                  toast.success(supplier.isActive ? "Поставщик в архиве" : "Поставщик восстановлен");
+                  onOpenChange(false);
+                },
+                onError: (err) => toast.error(getErrorMessage(err)),
+              },
+            )
+          }
+        >
+          {supplier.isActive ? "В архив" : "Восстановить"}
+        </Button>
+      </form>
+    </ResponsiveDialog>
   );
 }
 

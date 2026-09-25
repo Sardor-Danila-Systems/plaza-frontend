@@ -171,6 +171,9 @@ export interface Supplier {
   name: string;
   contactPerson: string | null;
   phone: string | null;
+  /** ИНН/СТИР — nine digits, or null. A string, not a number: leading
+   * zeros are significant. */
+  taxId: string | null;
   comment: string | null;
   isActive: boolean;
   createdAt: string;
