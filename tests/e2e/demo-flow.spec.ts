@@ -492,6 +492,25 @@ test.describe("supplier taxpayer id and search", () => {
     await page.getByLabel("Поиск поставщиков").fill("987654321");
     await expect(page.getByText(withoutTaxId)).toBeVisible({ timeout: 10000 });
   });
+
+  test("clearing an existing ИНН actually clears it, not a silent no-op", async () => {
+    await login(page, MANAGER);
+    await page.goto("/suppliers");
+    await page.getByLabel("Поиск поставщиков").fill(withTaxId);
+    await page.getByText(withTaxId).click();
+    await page.waitForURL(/\/suppliers\/[a-f0-9-]+$/);
+    await expect(page.getByText(`ИНН ${taxId}`)).toBeVisible();
+
+    await page.getByRole("button", { name: "Изменить поставщика" }).click();
+    await page.fill("#edit-supplier-tax-id", "");
+    await page.locator("[role=dialog], [data-slot=drawer-content]").last()
+      .locator("button[type=submit]").click();
+    // No more ИНН line anywhere on the page, and reloading confirms it
+    // actually persisted (not just a stale client-side cache).
+    await expect(page.getByText(/ИНН \d/)).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText(/ИНН \d/)).toHaveCount(0);
+  });
 });
 
 test.describe("creating master data from inside the purchase form", () => {

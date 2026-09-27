@@ -17,10 +17,13 @@ export interface CreateSupplierInput {
 
 export interface UpdateSupplierInput {
   name?: string;
-  contactPerson?: string;
-  phone?: string;
-  taxId?: string;
-  comment?: string;
+  // null explicitly clears the field (backend: omitted = untouched, null =
+  // cleared — see UpdateSupplierDto); name has no clear semantic, a
+  // supplier always needs one.
+  contactPerson?: string | null;
+  phone?: string | null;
+  taxId?: string | null;
+  comment?: string | null;
   isActive?: boolean;
 }
 

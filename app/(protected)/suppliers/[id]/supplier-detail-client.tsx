@@ -210,10 +210,13 @@ function EditSupplierDialog({
               id: supplier.id,
               body: {
                 name: name.trim(),
-                contactPerson: contactPerson.trim() || undefined,
-                phone: phone.trim() || undefined,
-                taxId: taxId || undefined,
-                comment: comment.trim() || undefined,
+                // null (not undefined) so clearing a previously-set field
+                // actually clears it instead of silently no-op'ing — see
+                // UpdateSupplierInput.
+                contactPerson: contactPerson.trim() || null,
+                phone: phone.trim() || null,
+                taxId: taxId || null,
+                comment: comment.trim() || null,
               },
             },
             {
