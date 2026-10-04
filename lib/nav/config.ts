@@ -117,7 +117,7 @@ export interface QuickAction {
  * `quickActionsForRole`, never this list directly: a cashier gets only the
  * cash operations, read-only roles get none. */
 export const QUICK_ACTIONS: QuickAction[] = [
-  { href: "/finance/new?type=INCOME", label: "Доход", icon: ArrowDownCircle, tone: "success" },
+  { href: "/finance/new?type=INCOME", label: "Приход", icon: ArrowDownCircle, tone: "success" },
   { href: "/finance/new?type=EXPENSE", label: "Расход", icon: ArrowUpCircle, tone: "destructive" },
   { href: "/finance/new?type=SALARY", label: "Зарплата", icon: Banknote, tone: "gold" },
   { href: "/purchases/new", label: "Закупка", icon: ShoppingCart, tone: "chart-4" },

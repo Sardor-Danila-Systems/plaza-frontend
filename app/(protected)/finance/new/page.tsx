@@ -20,7 +20,7 @@ import { isPositiveDecimalString } from "@/lib/format/decimal";
 import type { CashAccount, CreatableTransactionType } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<CreatableTransactionType, string> = {
-  INCOME: "Доход",
+  INCOME: "Приход",
   EXPENSE: "Расход",
   SALARY: "Зарплата",
 };
@@ -31,7 +31,7 @@ export default function NewFinanceTransactionPage() {
   const searchParams = useSearchParams();
   // The URL's `type` param is the single source of truth — not a useState
   // seeded from it once. A useState initial value only runs on mount, so a
-  // client-side navigation from the quick-action FAB (e.g. Доход -> Расход)
+  // client-side navigation from the quick-action FAB (e.g. Приход -> Расход)
   // that reuses this already-mounted route/component never re-read it,
   // leaving the form stuck on whichever type was open first. Deriving it
   // fresh every render fixes that regardless of whether the component

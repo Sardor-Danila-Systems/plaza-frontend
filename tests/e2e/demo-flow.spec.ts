@@ -590,7 +590,7 @@ test.describe("quick-action routing regression", () => {
   // on the first open, and not only when the in-page Tabs are clicked
   // directly (that path always worked; only FAB -> FAB re-navigation
   // exposed the bug — see app/(protected)/finance/new/page.tsx).
-  test("FAB Доход -> Расход -> Зарплата -> Доход always opens the matching tab with fields reset", async ({
+  test("FAB Приход -> Расход -> Зарплата -> Приход always opens the matching tab with fields reset", async ({
     page,
   }) => {
     await login(page, MANAGER);
@@ -601,9 +601,9 @@ test.describe("quick-action routing regression", () => {
       await page.getByRole("button", { name: label, exact: true }).click();
     }
 
-    await openViaFab("Доход");
+    await openViaFab("Приход");
     await expect(page).toHaveURL(/type=INCOME/);
-    await expect(page.getByRole("tab", { name: "Доход" })).toHaveAttribute("data-state", "active");
+    await expect(page.getByRole("tab", { name: "Приход" })).toHaveAttribute("data-state", "active");
     await page.fill("#amount", "12345");
 
     await openViaFab("Расход");
@@ -617,9 +617,9 @@ test.describe("quick-action routing regression", () => {
     await expect(page.getByRole("tab", { name: "Зарплата" })).toHaveAttribute("data-state", "active");
     await expect(page.locator("#amount")).toHaveValue("");
 
-    await openViaFab("Доход");
+    await openViaFab("Приход");
     await expect(page).toHaveURL(/type=INCOME/);
-    await expect(page.getByRole("tab", { name: "Доход" })).toHaveAttribute("data-state", "active");
+    await expect(page.getByRole("tab", { name: "Приход" })).toHaveAttribute("data-state", "active");
     await expect(page.locator("#amount")).toHaveValue("");
   });
 });
@@ -710,7 +710,7 @@ test.describe("cashier (Касса only)", () => {
     // Quick actions are the three cash operations only.
     await page.locator('button[aria-label="Новая операция"]').click();
     const sheet = page.locator("[role=dialog], [data-slot=drawer-content]").last();
-    await expect(sheet.getByRole("button", { name: "Доход" })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Приход" })).toBeVisible();
     await expect(sheet.getByRole("button", { name: "Закупка" })).toHaveCount(0);
     await expect(sheet.getByRole("button", { name: "Списание" })).toHaveCount(0);
     await page.keyboard.press("Escape");

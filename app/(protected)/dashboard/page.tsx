@@ -28,7 +28,7 @@ import { QUICK_ACTION_TONE_CLASSES, quickActionsForRole } from "@/lib/nav/config
 import { CASH_ACCOUNTS, CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
-  INCOME: "Доход",
+  INCOME: "Приход",
   EXPENSE: "Расход",
   SALARY: "Зарплата",
   PURCHASE: "Закупка",

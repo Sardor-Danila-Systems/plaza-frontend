@@ -20,7 +20,7 @@ import { canPostCash } from "@/lib/auth/permissions";
 import { CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
-  INCOME: "Доход",
+  INCOME: "Приход",
   EXPENSE: "Расход",
   SALARY: "Зарплата",
   PURCHASE: "Закупка",

@@ -16,7 +16,7 @@ import { formatBusinessDate } from "@/lib/format/date";
 import { formatQuantity } from "@/lib/format/decimal";
 
 const TYPE_LABELS: Record<string, string> = {
-  INCOME: "Доход",
+  INCOME: "Приход",
   EXPENSE: "Расход",
   SALARY: "Зарплата",
   PURCHASE: "Закупка",

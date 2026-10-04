@@ -28,7 +28,7 @@ import { CASH_ACCOUNTS, CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 import type { CashAccount, FinancialTransactionType } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
-  INCOME: "Доход",
+  INCOME: "Приход",
   EXPENSE: "Расход",
   SALARY: "Зарплата",
   PURCHASE: "Закупка",
@@ -73,7 +73,7 @@ export default function FinancePage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => router.push("/finance/new?type=INCOME")}>
                   <ArrowDownCircle className="size-4" />
-                  Доход
+                  Приход
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => router.push("/finance/new?type=EXPENSE")}>
                   <ArrowUpCircle className="size-4" />
@@ -115,7 +115,7 @@ export default function FinancePage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Все типы</SelectItem>
-            <SelectItem value="INCOME">Доход</SelectItem>
+            <SelectItem value="INCOME">Приход</SelectItem>
             <SelectItem value="EXPENSE">Расход</SelectItem>
             <SelectItem value="SALARY">Зарплата</SelectItem>
           </SelectContent>
