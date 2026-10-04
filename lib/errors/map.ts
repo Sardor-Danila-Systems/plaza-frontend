@@ -6,7 +6,9 @@ const ERROR_MESSAGES_RU: Record<string, string> = {
   FORBIDDEN: "У вас нет прав для этого действия.",
   NOT_FOUND: "Запись не найдена.",
   INSUFFICIENT_STOCK: "Недостаточно материала на складе.",
-  INSUFFICIENT_CASH: "Недостаточно средств в кассе.",
+  INSUFFICIENT_CASH: "Недостаточно средств в выбранной кассе.",
+  CANCEL_VIA_SOURCE_OPERATION:
+    "Эта операция — часть закупки или оплаты поставщику. Отмените её в разделе «Закупки» или у поставщика.",
   IDEMPOTENCY_KEY_REUSED: "Этот запрос уже был использован с другими данными.",
   CANCELLATION_HAS_DEPENDENCIES:
     "Операцию нельзя отменить: от неё зависят другие записи.",

@@ -16,7 +16,8 @@ import { useIdempotencyKey } from "@/lib/idempotency";
 import { formatBusinessDate, formatDateTime } from "@/lib/format/date";
 import { getErrorMessage } from "@/lib/errors/map";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canPostCash } from "@/lib/auth/permissions";
+import { CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
   INCOME: "Доход",
@@ -37,12 +38,18 @@ export function FinanceDetailClient({ id }: { id: string }) {
   const { key, renew } = useIdempotencyKey();
   const [cancelOpen, setCancelOpen] = useState(false);
 
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canPostCash(user?.role);
 
   if (isLoading) return <Skeleton className="h-64 w-full rounded-lg" />;
   if (isError || !data) return <ErrorState error={error} onRetry={() => refetch()} />;
 
-  const canCancel = canMutate && !data.cancelledAt;
+  // Only operations posted from Касса itself can be cancelled here; the
+  // cash leg of a purchase/advance/debt payment is undone from its owner.
+  const canCancel =
+    canMutate &&
+    !data.cancelledAt &&
+    !data.reversalOfId &&
+    (data.type === "INCOME" || data.type === "EXPENSE" || data.type === "SALARY");
 
   return (
     <div className="space-y-4">
@@ -72,6 +79,9 @@ export function FinanceDetailClient({ id }: { id: string }) {
           <dl className="grid grid-cols-2 gap-y-3 text-sm">
             <dt className="text-muted-foreground">Дата</dt>
             <dd className="text-right">{formatBusinessDate(data.occurredAt)}</dd>
+
+            <dt className="text-muted-foreground">Касса</dt>
+            <dd className="text-right">{CASH_ACCOUNT_LABELS[data.account]}</dd>
 
             {data.categoryNameSnapshot && (
               <>

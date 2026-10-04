@@ -3,7 +3,19 @@
 // Money/quantity/rate fields are decimal strings end to end — never parsed
 // into JS `number` for accounting arithmetic. See lib/format/decimal.ts.
 
-export type Role = "OWNER" | "ACCOUNTANT" | "PROJECT_MANAGER";
+/** CASHIER runs one project's cash ledger (Касса) and sees nothing else. */
+export type Role = "OWNER" | "ACCOUNTANT" | "PROJECT_MANAGER" | "CASHIER";
+
+/** The project's two cash accounts. Every balance and every
+ * "insufficient cash" check is per account. */
+export type CashAccount = "CASH" | "BANK";
+
+export const CASH_ACCOUNTS: CashAccount[] = ["CASH", "BANK"];
+
+export const CASH_ACCOUNT_LABELS: Record<CashAccount, string> = {
+  CASH: "Наличные",
+  BANK: "Банковский счёт",
+};
 
 export type Currency = "UZS" | "USD";
 
@@ -104,9 +116,17 @@ export interface Floor {
   createdAt: string;
 }
 
-export interface Balance {
+export interface AccountBalance {
+  account: CashAccount;
   uzs: string;
   usd: string;
+}
+
+export interface Balance {
+  /** Sum over both accounts. */
+  uzs: string;
+  usd: string;
+  byAccount: AccountBalance[];
 }
 
 export interface TransactionCategory {
@@ -146,6 +166,7 @@ export interface FinancialTransaction {
   direction: TransactionDirection;
   amount: string;
   currency: Currency;
+  account: CashAccount;
   exchangeRate: string;
   amountUzs: string;
   rateSource: RateSource;

@@ -6,9 +6,27 @@ import { Select as SelectPrimitive } from "radix-ui"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
 function Select({
+  onValueChange,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+  // Radix re-emits onValueChange("") when the option list changes under a
+  // controlled value — exactly what happens right after a record is created
+  // inline, selected, and its list refetches — silently clearing the pick.
+  // A <SelectItem> may never have value="" (Radix throws), so "" is never a
+  // real user choice and is dropped here for every Select in the app.
+  const handleValueChange = React.useCallback(
+    (value: string) => {
+      if (value !== "") onValueChange?.(value)
+    },
+    [onValueChange]
+  )
+  return (
+    <SelectPrimitive.Root
+      data-slot="select"
+      onValueChange={handleValueChange}
+      {...props}
+    />
+  )
 }
 
 function SelectGroup({

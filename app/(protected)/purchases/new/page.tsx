@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSuppliers, useSupplierAdvances } from "@/lib/query/hooks/use-suppliers";
 import { useWarehouses, useMaterials } from "@/lib/query/hooks/use-inventory";
-import { useCurrencyRates, useLiveCurrencyRate, useCreateCurrencyRate } from "@/lib/query/hooks/use-finance";
 import { useCreatePurchase } from "@/lib/query/hooks/use-purchases";
 import { CreateSupplierDialog } from "@/components/shared/create-supplier-dialog";
 import { CreateWarehouseDialog } from "@/components/shared/create-warehouse-dialog";
@@ -21,7 +20,8 @@ import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
 import { todayBusinessDate } from "@/lib/format/date";
 import { formatMoney, isPositiveDecimalString, previewMultiply, previewSum } from "@/lib/format/decimal";
-import type { AdvanceAllocationInput, Currency, PurchaseItemInput } from "@/lib/api/types";
+import type { AdvanceAllocationInput, CashAccount, PurchaseItemInput } from "@/lib/api/types";
+import { CashAccountPicker } from "@/components/shared/cash-account-picker";
 
 interface ItemRow extends PurchaseItemInput {
   key: string;
@@ -31,18 +31,13 @@ export default function NewPurchasePage() {
   const router = useRouter();
   const [supplierId, setSupplierId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
-  const [currency, setCurrency] = useState<Currency>("UZS");
-  const [rateMode, setRateMode] = useState<"referenced" | "manual">("referenced");
-  const [currencyRateId, setCurrencyRateId] = useState("");
-  const [exchangeRate, setExchangeRate] = useState("");
-  const [rateOverrideReason, setRateOverrideReason] = useState("");
   const [items, setItems] = useState<ItemRow[]>([
     { key: crypto.randomUUID(), materialId: "", quantity: "", unitPrice: "" },
   ]);
   const [selectedAdvanceIds, setSelectedAdvanceIds] = useState<string[]>([]);
   const [advanceAmounts, setAdvanceAmounts] = useState<Record<string, string>>({});
-  const [advanceSettlementRates, setAdvanceSettlementRates] = useState<Record<string, string>>({});
   const [cashPaid, setCashPaid] = useState("");
+  const [cashAccount, setCashAccount] = useState<CashAccount>("CASH");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [comment, setComment] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayBusinessDate());
@@ -57,27 +52,16 @@ export default function NewPurchasePage() {
   const { data: suppliers = [] } = useSuppliers();
   const { data: warehouses = [] } = useWarehouses();
   const { data: materials = [] } = useMaterials({ isActive: true });
-  const { data: currencyRates = [] } = useCurrencyRates();
-  const { data: liveRate } = useLiveCurrencyRate();
-  const createRateMutation = useCreateCurrencyRate();
-
-  const useLiveRateAsReference = () => {
-    if (!liveRate) return;
-    createRateMutation.mutate(
-      {
-        currency: "USD",
-        rateUzs: liveRate.rateUzs,
-        effectiveOn: liveRate.asOf,
-        source: "PROVIDER",
-      },
-      { onSuccess: (rate) => setCurrencyRateId(rate.id) },
-    );
-  };
   const { data: supplierAdvances = [] } = useSupplierAdvances(supplierId);
   const createMutation = useCreatePurchase();
   const { key, renew } = useIdempotencyKey();
 
-  const usableAdvances = supplierAdvances.filter((a) => Number(a.availableAmount) > 0);
+  // The project works in сум only, so only сум advances can be applied —
+  // a historical USD advance would need a settlement rate this form no
+  // longer asks for.
+  const usableAdvances = supplierAdvances.filter(
+    (a) => a.currency === "UZS" && Number(a.availableAmount) > 0,
+  );
 
   const previewTotal = previewSum(
     items.map((i) => previewMultiply(i.quantity || "0", i.unitPrice || "0")),
@@ -98,15 +82,6 @@ export default function NewPurchasePage() {
   const updateItem = (rowKey: string, patch: Partial<ItemRow>) =>
     setItems((rows) => rows.map((r) => (r.key === rowKey ? { ...r, ...patch } : r)));
 
-  /** Radix Select re-emits `onValueChange("")` when its option list changes
-   * underneath a controlled value — which happens right after a supplier,
-   * warehouse or material is created inline and the list refetches. None of
-   * these selects has a real "no value" option, so an empty value is never
-   * a user choice and clearing the field would silently undo the pick. */
-  const ignoreEmpty = (set: (value: string) => void) => (value: string) => {
-    if (value) set(value);
-  };
-
   const toggleAdvance = (advanceId: string) => {
     setSelectedAdvanceIds((ids) =>
       ids.includes(advanceId) ? ids.filter((id) => id !== advanceId) : [...ids, advanceId],
@@ -125,14 +100,6 @@ export default function NewPurchasePage() {
       setFormError("Заполните все строки материалов корректно");
       return;
     }
-    if (currency === "USD" && rateMode === "referenced" && !currencyRateId) {
-      setFormError("Выберите курс или введите его вручную");
-      return;
-    }
-    if (currency === "USD" && rateMode === "manual" && (!exchangeRate || !rateOverrideReason.trim())) {
-      setFormError("Укажите курс и причину его ручного ввода");
-      return;
-    }
 
     const advanceAllocations: AdvanceAllocationInput[] = [];
     for (const advanceId of selectedAdvanceIds) {
@@ -141,17 +108,7 @@ export default function NewPurchasePage() {
         setFormError("Укажите сумму для каждого выбранного аванса");
         return;
       }
-      const advance = usableAdvances.find((a) => a.id === advanceId)!;
-      const needsRate = advance.currency !== currency && currency !== "UZS";
-      if (needsRate && !advanceSettlementRates[advanceId]) {
-        setFormError("Укажите курс пересчёта для аванса в другой валюте");
-        return;
-      }
-      advanceAllocations.push({
-        advanceId,
-        amount,
-        ...(needsRate ? { settlementExchangeRate: advanceSettlementRates[advanceId] } : {}),
-      });
+      advanceAllocations.push({ advanceId, amount });
     }
 
     createMutation.mutate(
@@ -159,11 +116,8 @@ export default function NewPurchasePage() {
         body: {
           supplierId,
           warehouseId,
-          currency,
-          ...(currency === "USD" && rateMode === "referenced" ? { currencyRateId } : {}),
-          ...(currency === "USD" && rateMode === "manual"
-            ? { exchangeRate, rateOverrideReason: rateOverrideReason.trim() }
-            : {}),
+          currency: "UZS",
+          ...(cashPaid.trim() ? { account: cashAccount } : {}),
           items: items.map(({ materialId, quantity, unitPrice }) => ({ materialId, quantity, unitPrice })),
           advanceAllocations: advanceAllocations.length > 0 ? advanceAllocations : undefined,
           cashPaid: cashPaid.trim() || undefined,
@@ -202,10 +156,10 @@ export default function NewPurchasePage() {
             <div className="flex gap-2">
               <Select
                 value={supplierId}
-                onValueChange={ignoreEmpty((v) => {
+                onValueChange={(v) => {
                   setSupplierId(v);
                   setSelectedAdvanceIds([]);
-                })}
+                }}
               >
                 <SelectTrigger className="h-11 flex-1" aria-labelledby="purchase-supplier-label">
                   <SelectValue placeholder="Выберите поставщика" />
@@ -234,7 +188,7 @@ export default function NewPurchasePage() {
           <div className="space-y-2">
             <Label id="purchase-warehouse-label">Склад поступления</Label>
             <div className="flex gap-2">
-              <Select value={warehouseId} onValueChange={ignoreEmpty(setWarehouseId)}>
+              <Select value={warehouseId} onValueChange={setWarehouseId}>
                 <SelectTrigger className="h-11 flex-1" aria-labelledby="purchase-warehouse-label">
                   <SelectValue placeholder="Выберите склад" />
                 </SelectTrigger>
@@ -261,98 +215,6 @@ export default function NewPurchasePage() {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label id="purchase-currency-label">Валюта</Label>
-          <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-            <SelectTrigger className="h-11 w-32" aria-labelledby="purchase-currency-label">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="UZS">UZS</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {currency === "USD" && (
-          <div className="space-y-3 rounded-lg border p-3">
-            <div className="flex gap-2 text-sm">
-              <button
-                type="button"
-                className={`rounded-md px-3 py-1.5 ${rateMode === "referenced" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
-                onClick={() => setRateMode("referenced")}
-              >
-                Курс из списка
-              </button>
-              <button
-                type="button"
-                className={`rounded-md px-3 py-1.5 ${rateMode === "manual" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
-                onClick={() => setRateMode("manual")}
-              >
-                Свой курс
-              </button>
-            </div>
-            {rateMode === "referenced" ? (
-              currencyRates.length > 0 ? (
-                <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
-                  <SelectTrigger className="h-11 w-full">
-                    <SelectValue placeholder="Выберите курс" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currencyRates.map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {formatMoney(r.rateUzs, "UZS")} ({r.effectiveOn})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : liveRate ? (
-                <div className="space-y-2 rounded-md border border-dashed p-3">
-                  <p className="text-sm text-muted-foreground">
-                    В проекте ещё нет сохранённых курсов. Актуальный официальный курс ЦБ РУз на{" "}
-                    {liveRate.asOf}:{" "}
-                    <span className="font-medium text-foreground">{formatMoney(liveRate.rateUzs, "UZS")}</span> за 1
-                    USD.
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={currencyRateId ? "secondary" : "default"}
-                    disabled={createRateMutation.isPending}
-                    onClick={useLiveRateAsReference}
-                  >
-                    {currencyRateId
-                      ? "Курс использован"
-                      : createRateMutation.isPending
-                        ? "Сохранение…"
-                        : "Использовать этот курс"}
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  В проекте ещё нет сохранённых курсов, а актуальный курс сейчас недоступен — введите курс вручную.
-                </p>
-              )
-            ) : (
-              <div className="space-y-2">
-                <DecimalInput
-                  scale={8}
-                  className="h-11"
-                  placeholder="Курс, сум за 1 USD"
-                  value={exchangeRate}
-                  onValueChange={setExchangeRate}
-                />
-                <Textarea
-                  placeholder="Причина ручного ввода курса"
-                  value={rateOverrideReason}
-                  onChange={(e) => setRateOverrideReason(e.target.value)}
-                  rows={2}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Label id="purchase-materials-label">Материалы</Label>
@@ -372,7 +234,7 @@ export default function NewPurchasePage() {
               <div className="flex items-start gap-2">
                 <Select
                   value={row.materialId}
-                  onValueChange={ignoreEmpty((v) => updateItem(row.key, { materialId: v }))}
+                  onValueChange={(v) => updateItem(row.key, { materialId: v })}
                 >
                   <SelectTrigger className="h-11 flex-1" aria-labelledby="purchase-materials-label">
                     <SelectValue placeholder="Материал" />
@@ -411,13 +273,13 @@ export default function NewPurchasePage() {
               </div>
               {row.quantity && row.unitPrice && (
                 <p className="text-right text-xs text-muted-foreground">
-                  {formatMoney(previewMultiply(row.quantity, row.unitPrice), currency)}
+                  {formatMoney(previewMultiply(row.quantity, row.unitPrice), "UZS")}
                 </p>
               )}
             </div>
           ))}
           <p className="text-right text-sm font-medium">
-            Предварительный итог: {formatMoney(previewTotal, currency)}
+            Предварительный итог: {formatMoney(previewTotal, "UZS")}
           </p>
         </div>
 
@@ -426,7 +288,6 @@ export default function NewPurchasePage() {
             <Label>Использовать аванс поставщика</Label>
             {usableAdvances.map((advance) => {
               const checked = selectedAdvanceIds.includes(advance.id);
-              const needsRate = advance.currency !== currency && currency !== "UZS";
               return (
                 <div key={advance.id} className="space-y-2 rounded-md bg-muted/40 p-2">
                   <label className="flex items-center gap-2 text-sm">
@@ -446,17 +307,6 @@ export default function NewPurchasePage() {
                         value={advanceAmounts[advance.id] ?? ""}
                         onValueChange={(v) => setAdvanceAmounts((prev) => ({ ...prev, [advance.id]: v }))}
                       />
-                      {needsRate && (
-                        <DecimalInput
-                          scale={8}
-                          placeholder="Курс пересчёта"
-                          className="h-10"
-                          value={advanceSettlementRates[advance.id] ?? ""}
-                          onValueChange={(v) =>
-                            setAdvanceSettlementRates((prev) => ({ ...prev, [advance.id]: v }))
-                          }
-                        />
-                      )}
                     </div>
                   )}
                 </div>
@@ -466,7 +316,7 @@ export default function NewPurchasePage() {
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="purchase-cash-paid">Оплата наличными сейчас (необязательно)</Label>
+          <Label htmlFor="purchase-cash-paid">Оплата сейчас (необязательно)</Label>
           <DecimalInput
             id="purchase-cash-paid"
             scale={2}
@@ -476,6 +326,17 @@ export default function NewPurchasePage() {
             placeholder="0.00"
           />
         </div>
+
+        {/* Only asked once there is a payment to route — an unpaid
+          * purchase touches neither account. */}
+        {cashPaid.trim() && (
+          <CashAccountPicker
+            id="purchase-cash-account"
+            value={cashAccount}
+            onChange={setCashAccount}
+            label="Откуда оплачено"
+          />
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="purchase-invoice">№ накладной</Label>

@@ -10,14 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/shared/password-input";
 import { PageHeader } from "@/components/shared/page-header";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { useProject } from "@/lib/project/project-context";
 import { getErrorMessage } from "@/lib/errors/map";
-
-const ROLE_LABELS: Record<string, string> = {
-  OWNER: "Владелец",
-  ACCOUNTANT: "Бухгалтер",
-  PROJECT_MANAGER: "Менеджер проекта",
-};
 
 export default function ProfilePage() {
   const { user, updateProfile, changePassword } = useAuth();

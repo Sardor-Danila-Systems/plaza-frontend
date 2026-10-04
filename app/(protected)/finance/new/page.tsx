@@ -11,19 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  useCreateFinanceTransaction,
-  useFinanceCategories,
-  useCurrencyRates,
-  useLiveCurrencyRate,
-  useCreateCurrencyRate,
-} from "@/lib/query/hooks/use-finance";
-import { formatMoney } from "@/lib/format/decimal";
+import { useCreateFinanceTransaction, useFinanceCategories } from "@/lib/query/hooks/use-finance";
+import { CashAccountPicker } from "@/components/shared/cash-account-picker";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
 import { todayBusinessDate } from "@/lib/format/date";
 import { isPositiveDecimalString } from "@/lib/format/decimal";
-import type { CreatableTransactionType, Currency } from "@/lib/api/types";
+import type { CashAccount, CreatableTransactionType } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<CreatableTransactionType, string> = {
   INCOME: "Доход",
@@ -89,11 +83,8 @@ function FinanceForm({
   router: ReturnType<typeof useRouter>;
 }) {
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState<Currency>("UZS");
-  const [rateMode, setRateMode] = useState<"referenced" | "manual">("referenced");
-  const [currencyRateId, setCurrencyRateId] = useState("");
-  const [exchangeRate, setExchangeRate] = useState("");
-  const [rateOverrideReason, setRateOverrideReason] = useState("");
+  // The project works in сум only; the account is the one real choice.
+  const [account, setAccount] = useState<CashAccount>("CASH");
   const [categoryId, setCategoryId] = useState("");
   const [party, setParty] = useState("");
   const [comment, setComment] = useState("");
@@ -101,24 +92,8 @@ function FinanceForm({
   const [formError, setFormError] = useState<string | null>(null);
 
   const { data: categories = [] } = useFinanceCategories();
-  const { data: currencyRates = [] } = useCurrencyRates();
-  const { data: liveRate } = useLiveCurrencyRate();
-  const createRateMutation = useCreateCurrencyRate();
   const createMutation = useCreateFinanceTransaction();
   const { key, renew } = useIdempotencyKey();
-
-  const useLiveRateAsReference = () => {
-    if (!liveRate) return;
-    createRateMutation.mutate(
-      {
-        currency: "USD",
-        rateUzs: liveRate.rateUzs,
-        effectiveOn: liveRate.asOf,
-        source: "PROVIDER",
-      },
-      { onSuccess: (rate) => setCurrencyRateId(rate.id) },
-    );
-  };
 
   const relevantCategories = categories.filter((c) => c.kind === type && c.isActive);
 
@@ -130,25 +105,14 @@ function FinanceForm({
       setFormError("Введите корректную сумму");
       return;
     }
-    if (currency === "USD" && rateMode === "referenced" && !currencyRateId) {
-      setFormError("Выберите курс или введите его вручную");
-      return;
-    }
-    if (currency === "USD" && rateMode === "manual" && (!exchangeRate || !rateOverrideReason.trim())) {
-      setFormError("Укажите курс и причину его ручного ввода");
-      return;
-    }
 
     createMutation.mutate(
       {
         body: {
           type,
           amount,
-          currency,
-          ...(currency === "USD" && rateMode === "referenced" ? { currencyRateId } : {}),
-          ...(currency === "USD" && rateMode === "manual"
-            ? { exchangeRate, rateOverrideReason: rateOverrideReason.trim() }
-            : {}),
+          currency: "UZS",
+          account,
           categoryId: categoryId || undefined,
           source: type === "INCOME" ? party || undefined : undefined,
           recipient: type !== "INCOME" ? party || undefined : undefined,
@@ -173,96 +137,22 @@ function FinanceForm({
       {formError && <p className="text-sm text-destructive">{formError}</p>}
 
       <div className="space-y-2">
-        <Label htmlFor="amount">Сумма</Label>
-        <div className="flex gap-2">
-          <DecimalInput
-            id="amount"
-            scale={2}
-            className="h-11 flex-1"
-            value={amount}
-            onValueChange={setAmount}
-            placeholder="0.00"
-          />
-          <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-            <SelectTrigger className="h-11 w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="UZS">UZS</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Label htmlFor="amount">Сумма, сум</Label>
+        <DecimalInput
+          id="amount"
+          scale={2}
+          className="h-11"
+          value={amount}
+          onValueChange={setAmount}
+          placeholder="0.00"
+        />
       </div>
 
-      {currency === "USD" && (
-        <div className="space-y-3 rounded-lg border p-3">
-          <Tabs value={rateMode} onValueChange={(v) => setRateMode(v as "referenced" | "manual")}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="referenced">Курс из списка</TabsTrigger>
-              <TabsTrigger value="manual">Свой курс</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {rateMode === "referenced" ? (
-            currencyRates.length > 0 ? (
-              <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Выберите курс" />
-                </SelectTrigger>
-                <SelectContent>
-                  {currencyRates.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {formatMoney(r.rateUzs, "UZS")} ({r.effectiveOn})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : liveRate ? (
-              <div className="space-y-2 rounded-md border border-dashed p-3">
-                <p className="text-sm text-muted-foreground">
-                  В проекте ещё нет сохранённых курсов. Актуальный официальный курс ЦБ РУз на{" "}
-                  {liveRate.asOf}: <span className="font-medium text-foreground">{formatMoney(liveRate.rateUzs, "UZS")}</span>{" "}
-                  за 1 USD.
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={currencyRateId ? "secondary" : "default"}
-                  disabled={createRateMutation.isPending}
-                  onClick={useLiveRateAsReference}
-                >
-                  {currencyRateId
-                    ? "Курс использован"
-                    : createRateMutation.isPending
-                      ? "Сохранение…"
-                      : "Использовать этот курс"}
-                </Button>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                В проекте ещё нет сохранённых курсов, а актуальный курс сейчас недоступен — введите курс вручную.
-              </p>
-            )
-          ) : (
-            <div className="space-y-2">
-              <DecimalInput
-                scale={8}
-                className="h-11"
-                placeholder="Курс, сум за 1 USD"
-                value={exchangeRate}
-                onValueChange={setExchangeRate}
-              />
-              <Textarea
-                placeholder="Причина ручного ввода курса"
-                value={rateOverrideReason}
-                onChange={(e) => setRateOverrideReason(e.target.value)}
-                rows={2}
-              />
-            </div>
-          )}
-        </div>
-      )}
+      <CashAccountPicker
+        value={account}
+        onChange={setAccount}
+        label={type === "INCOME" ? "Куда поступили деньги" : "Откуда оплачено"}
+      />
 
       {relevantCategories.length > 0 && (
         <div className="space-y-2">

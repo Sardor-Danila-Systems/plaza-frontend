@@ -25,14 +25,14 @@ import {
   useCreateDebtPayment,
   useUpdateSupplier,
 } from "@/lib/query/hooks/use-suppliers";
-import { useCurrencyRates } from "@/lib/query/hooks/use-finance";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
 import { formatBusinessDate, todayBusinessDate } from "@/lib/format/date";
 import { formatMoney, isPositiveDecimalString } from "@/lib/format/decimal";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
-import type { Currency, Supplier } from "@/lib/api/types";
+import type { CashAccount, Currency, Supplier } from "@/lib/api/types";
+import { CashAccountPicker } from "@/components/shared/cash-account-picker";
 
 export function SupplierDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -306,18 +306,13 @@ function AdvanceDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [currency, setCurrency] = useState<Currency>("UZS");
   const [amount, setAmount] = useState("");
-  const [rateMode, setRateMode] = useState<"referenced" | "manual">("referenced");
-  const [currencyRateId, setCurrencyRateId] = useState("");
-  const [exchangeRate, setExchangeRate] = useState("");
-  const [rateOverrideReason, setRateOverrideReason] = useState("");
+  const [account, setAccount] = useState<CashAccount>("CASH");
   const [comment, setComment] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayBusinessDate());
   const [formError, setFormError] = useState<string | null>(null);
   const [fundingPaymentId, setFundingPaymentId] = useState<string | null>(null);
 
-  const { data: currencyRates = [] } = useCurrencyRates();
   const createMutation = useCreateSupplierAdvance();
   const { key, renew } = useIdempotencyKey();
 
@@ -336,25 +331,14 @@ function AdvanceDialog({
       setFormError("Введите корректную сумму");
       return;
     }
-    if (currency === "USD" && rateMode === "referenced" && !currencyRateId) {
-      setFormError("Выберите курс или введите его вручную");
-      return;
-    }
-    if (currency === "USD" && rateMode === "manual" && (!exchangeRate || !rateOverrideReason.trim())) {
-      setFormError("Укажите курс и причину его ручного ввода");
-      return;
-    }
 
     createMutation.mutate(
       {
         supplierId,
         body: {
-          currency,
+          currency: "UZS",
+          account,
           amount,
-          ...(currency === "USD" && rateMode === "referenced" ? { currencyRateId } : {}),
-          ...(currency === "USD" && rateMode === "manual"
-            ? { exchangeRate, rateOverrideReason: rateOverrideReason.trim() }
-            : {}),
           comment: comment.trim() || undefined,
           occurredAt,
         },
@@ -402,41 +386,23 @@ function AdvanceDialog({
       <form onSubmit={onSubmit} className="space-y-4">
         {formError && <p className="text-sm text-destructive">{formError}</p>}
         <div className="space-y-2">
-          <Label id="advance-amount-label" htmlFor="advance-amount">Сумма</Label>
-          <div className="flex gap-2">
-            <DecimalInput
-              id="advance-amount"
-              scale={2}
-              className="h-11 flex-1"
-              value={amount}
-              onValueChange={setAmount}
-              placeholder="0.00"
-            />
-            <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-              <SelectTrigger className="h-11 w-24" aria-label="Валюта">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="UZS">UZS</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Label id="advance-amount-label" htmlFor="advance-amount">Сумма, сум</Label>
+          <DecimalInput
+            id="advance-amount"
+            scale={2}
+            className="h-11"
+            value={amount}
+            onValueChange={setAmount}
+            placeholder="0.00"
+          />
         </div>
 
-        {currency === "USD" && (
-          <RateFields
-            rateMode={rateMode}
-            setRateMode={setRateMode}
-            currencyRateId={currencyRateId}
-            setCurrencyRateId={setCurrencyRateId}
-            exchangeRate={exchangeRate}
-            setExchangeRate={setExchangeRate}
-            rateOverrideReason={rateOverrideReason}
-            setRateOverrideReason={setRateOverrideReason}
-            currencyRates={currencyRates}
-          />
-        )}
+        <CashAccountPicker
+          id="advance-account"
+          value={account}
+          onChange={setAccount}
+          label="Откуда оплачено"
+        />
 
         <div className="space-y-2">
           <Label htmlFor="advance-date">Дата</Label>
@@ -476,12 +442,8 @@ function DebtPaymentDialog({
 }) {
   const payable = purchases.filter((p) => !p.cancelled && Number(p.remainingDebt) > 0);
   const [purchaseId, setPurchaseId] = useState("");
-  const [currency, setCurrency] = useState<Currency>("UZS");
   const [amount, setAmount] = useState("");
-  const [rateMode, setRateMode] = useState<"referenced" | "manual">("referenced");
-  const [currencyRateId, setCurrencyRateId] = useState("");
-  const [exchangeRate, setExchangeRate] = useState("");
-  const [rateOverrideReason, setRateOverrideReason] = useState("");
+  const [account, setAccount] = useState<CashAccount>("CASH");
   const [settlementExchangeRate, setSettlementExchangeRate] = useState("");
   const [comment, setComment] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayBusinessDate());
@@ -489,7 +451,6 @@ function DebtPaymentDialog({
   const [fundingPaymentId, setFundingPaymentId] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
 
-  const { data: currencyRates = [] } = useCurrencyRates();
   const createMutation = useCreateDebtPayment();
   const { key, renew } = useIdempotencyKey();
 
@@ -504,8 +465,10 @@ function DebtPaymentDialog({
   };
 
   const selectedPurchase = payable.find((p) => p.id === purchaseId);
-  const needsSettlementRate =
-    !!selectedPurchase && selectedPurchase.currency !== currency && selectedPurchase.currency !== "UZS";
+  // Payments are made in сум only. A purchase recorded in USD before the
+  // switch still has a USD debt, and closing it in сум needs the rate the
+  // debt is settled at.
+  const needsSettlementRate = !!selectedPurchase && selectedPurchase.currency !== "UZS";
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -518,14 +481,6 @@ function DebtPaymentDialog({
       setFormError("Введите корректную сумму");
       return;
     }
-    if (currency === "USD" && rateMode === "referenced" && !currencyRateId) {
-      setFormError("Выберите курс или введите его вручную");
-      return;
-    }
-    if (currency === "USD" && rateMode === "manual" && (!exchangeRate || !rateOverrideReason.trim())) {
-      setFormError("Укажите курс и причину его ручного ввода");
-      return;
-    }
     if (needsSettlementRate && !settlementExchangeRate) {
       setFormError("Укажите курс пересчёта для закрытия долга в другой валюте");
       return;
@@ -536,12 +491,9 @@ function DebtPaymentDialog({
         supplierId,
         body: {
           purchaseId,
-          currency,
+          currency: "UZS",
+          account,
           amount,
-          ...(currency === "USD" && rateMode === "referenced" ? { currencyRateId } : {}),
-          ...(currency === "USD" && rateMode === "manual"
-            ? { exchangeRate, rateOverrideReason: rateOverrideReason.trim() }
-            : {}),
           ...(needsSettlementRate ? { settlementExchangeRate } : {}),
           comment: comment.trim() || undefined,
           occurredAt,
@@ -607,7 +559,7 @@ function DebtPaymentDialog({
             <SelectContent>
               {payable.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
-                  {formatBusinessDate(p.occurredAt)} — долг {p.remainingDebt} {p.currency}
+                  {formatBusinessDate(p.occurredAt)} — долг {formatMoney(p.remainingDebt, p.currency)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -615,41 +567,18 @@ function DebtPaymentDialog({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="debt-amount">Сумма оплаты</Label>
-          <div className="flex gap-2">
-            <DecimalInput
-              id="debt-amount"
-              scale={2}
-              className="h-11 flex-1"
-              value={amount}
-              onValueChange={setAmount}
-              placeholder="0.00"
-            />
-            <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
-              <SelectTrigger className="h-11 w-24" aria-label="Валюта">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="UZS">UZS</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Label htmlFor="debt-amount">Сумма оплаты, сум</Label>
+          <DecimalInput
+            id="debt-amount"
+            scale={2}
+            className="h-11"
+            value={amount}
+            onValueChange={setAmount}
+            placeholder="0.00"
+          />
         </div>
 
-        {currency === "USD" && (
-          <RateFields
-            rateMode={rateMode}
-            setRateMode={setRateMode}
-            currencyRateId={currencyRateId}
-            setCurrencyRateId={setCurrencyRateId}
-            exchangeRate={exchangeRate}
-            setExchangeRate={setExchangeRate}
-            rateOverrideReason={rateOverrideReason}
-            setRateOverrideReason={setRateOverrideReason}
-            currencyRates={currencyRates}
-          />
-        )}
+        <CashAccountPicker id="debt-account" value={account} onChange={setAccount} label="Откуда оплачено" />
 
         {needsSettlementRate && (
           <div className="space-y-2">
@@ -687,78 +616,5 @@ function DebtPaymentDialog({
         </Button>
       </form>
     </ResponsiveDialog>
-  );
-}
-
-function RateFields({
-  rateMode,
-  setRateMode,
-  currencyRateId,
-  setCurrencyRateId,
-  exchangeRate,
-  setExchangeRate,
-  rateOverrideReason,
-  setRateOverrideReason,
-  currencyRates,
-}: {
-  rateMode: "referenced" | "manual";
-  setRateMode: (v: "referenced" | "manual") => void;
-  currencyRateId: string;
-  setCurrencyRateId: (v: string) => void;
-  exchangeRate: string;
-  setExchangeRate: (v: string) => void;
-  rateOverrideReason: string;
-  setRateOverrideReason: (v: string) => void;
-  currencyRates: { id: string; rateUzs: string; effectiveOn: string }[];
-}) {
-  return (
-    <div className="space-y-3 rounded-lg border p-3">
-      <div className="flex gap-2 text-sm">
-        <button
-          type="button"
-          className={`rounded-md px-3 py-1.5 ${rateMode === "referenced" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
-          onClick={() => setRateMode("referenced")}
-        >
-          Курс из списка
-        </button>
-        <button
-          type="button"
-          className={`rounded-md px-3 py-1.5 ${rateMode === "manual" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
-          onClick={() => setRateMode("manual")}
-        >
-          Свой курс
-        </button>
-      </div>
-      {rateMode === "referenced" ? (
-        <Select value={currencyRateId} onValueChange={setCurrencyRateId}>
-          <SelectTrigger className="h-11 w-full">
-            <SelectValue placeholder="Выберите курс" />
-          </SelectTrigger>
-          <SelectContent>
-            {currencyRates.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
-                {formatMoney(r.rateUzs, "UZS")} ({r.effectiveOn})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <div className="space-y-2">
-          <DecimalInput
-            scale={8}
-            className="h-11"
-            placeholder="Курс, сум за 1 USD"
-            value={exchangeRate}
-            onValueChange={setExchangeRate}
-          />
-          <Textarea
-            placeholder="Причина ручного ввода курса"
-            value={rateOverrideReason}
-            onChange={(e) => setRateOverrideReason(e.target.value)}
-            rows={2}
-          />
-        </div>
-      )}
-    </div>
   );
 }

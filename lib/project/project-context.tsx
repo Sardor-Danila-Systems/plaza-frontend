@@ -39,7 +39,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     if (explicitProjectId && projects.some((p) => p.id === explicitProjectId)) {
       return explicitProjectId;
     }
-    if (user.role === "PROJECT_MANAGER" && user.projectId) {
+    // Project-scoped roles (manager, cashier) are pinned to their one project.
+    if ((user.role === "PROJECT_MANAGER" || user.role === "CASHIER") && user.projectId) {
       return user.projectId;
     }
     const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
@@ -73,7 +74,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       project,
       projects,
       isLoading,
-      canSwitch: user?.role !== "PROJECT_MANAGER",
+      canSwitch: user?.role !== "PROJECT_MANAGER" && user?.role !== "CASHIER",
       setProjectId,
     }),
     [projectId, project, projects, isLoading, user, setProjectId],

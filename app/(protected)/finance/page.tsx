@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDownCircle, ArrowUpCircle, Banknote, Plus, Wallet } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,17 +13,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Stat, StatRow } from "@/components/shared/stat-row";
 import { DataList, DataListRow } from "@/components/shared/data-list";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { MoneyText } from "@/components/shared/money-text";
-import { CombinedCashCard } from "@/components/shared/combined-cash-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { useFinanceBalance, useFinanceList } from "@/lib/query/hooks/use-finance";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canPostCash } from "@/lib/auth/permissions";
 import { formatBusinessDate } from "@/lib/format/date";
-import type { FinancialTransactionType } from "@/lib/api/types";
+import { formatMoney } from "@/lib/format/decimal";
+import { CASH_ACCOUNTS, CASH_ACCOUNT_LABELS } from "@/lib/api/types";
+import type { CashAccount, FinancialTransactionType } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
   INCOME: "Доход",
@@ -40,8 +41,9 @@ const TYPE_LABELS: Record<string, string> = {
 export default function FinancePage() {
   const router = useRouter();
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canPostCash(user?.role);
   const [type, setType] = useState<string>("ALL");
+  const [account, setAccount] = useState<string>("ALL");
   const { data: balance, isLoading: balanceLoading } = useFinanceBalance();
   const {
     data,
@@ -51,6 +53,7 @@ export default function FinancePage() {
     refetch,
   } = useFinanceList({
     type: type === "ALL" ? undefined : (type as FinancialTransactionType),
+    account: account === "ALL" ? undefined : (account as CashAccount),
     pageSize: 50,
   });
 
@@ -86,40 +89,24 @@ export default function FinancePage() {
         }
       />
 
-      <CombinedCashCard />
-
-      <div className="grid grid-cols-2 gap-3">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between pb-1">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Сум</CardTitle>
-            <Wallet className="size-3.5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {balanceLoading ? (
-              <Skeleton className="h-7 w-24" />
-            ) : (
-              <p className="text-xl font-semibold tabular-nums">
-                <MoneyText value={balance?.uzs ?? "0"} currency="UZS" />
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between pb-1">
-            <CardTitle className="text-xs font-medium text-muted-foreground">USD</CardTitle>
-            <Wallet className="size-3.5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {balanceLoading ? (
-              <Skeleton className="h-7 w-24" />
-            ) : (
-              <p className="text-xl font-semibold tabular-nums">
-                <MoneyText value={balance?.usd ?? "0"} currency="USD" />
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* The project runs two cash accounts; money in one cannot pay from the
+        * other, so each balance is shown on its own next to their total. */}
+      <StatRow className="sm:grid-cols-3">
+        <Stat
+          label="Всего"
+          isLoading={balanceLoading}
+          value={formatMoney(balance?.uzs ?? "0", "UZS")}
+          className="col-span-2 sm:col-span-1"
+        />
+        {CASH_ACCOUNTS.map((acc) => (
+          <Stat
+            key={acc}
+            label={CASH_ACCOUNT_LABELS[acc]}
+            isLoading={balanceLoading}
+            value={formatMoney(balance?.byAccount.find((b) => b.account === acc)?.uzs ?? "0", "UZS")}
+          />
+        ))}
+      </StatRow>
 
       <div className="flex items-center gap-2">
         <Select value={type} onValueChange={setType}>
@@ -131,6 +118,19 @@ export default function FinancePage() {
             <SelectItem value="INCOME">Доход</SelectItem>
             <SelectItem value="EXPENSE">Расход</SelectItem>
             <SelectItem value="SALARY">Зарплата</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={account} onValueChange={setAccount}>
+          <SelectTrigger className="h-9 w-44" aria-label="Касса">
+            <SelectValue placeholder="Все кассы" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Все кассы</SelectItem>
+            {CASH_ACCOUNTS.map((acc) => (
+              <SelectItem key={acc} value={acc}>
+                {CASH_ACCOUNT_LABELS[acc]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -163,6 +163,7 @@ export default function FinancePage() {
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {formatBusinessDate(tx.occurredAt)}
+                    {` · ${CASH_ACCOUNT_LABELS[tx.account]}`}
                     {tx.recipient ? ` · ${tx.recipient}` : ""}
                     {tx.cancelledAt ? " · отменено" : ""}
                   </p>

@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "cn";
-import { NAV_GROUP_LABELS, NAV_GROUP_ORDER, SECTIONS, QUICK_ACTIONS, QUICK_ACTION_TONE_CLASSES } from "@/lib/nav/config";
+import {
+  NAV_GROUP_LABELS,
+  NAV_GROUP_ORDER,
+  QUICK_ACTION_TONE_CLASSES,
+  quickActionsForRole,
+  sectionsForRole,
+} from "@/lib/nav/config";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { Plus } from "lucide-react";
 import {
   DropdownMenu,
@@ -17,16 +23,11 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ProjectSwitcher } from "@/components/layout/project-switcher";
 
-const ROLE_LABELS: Record<string, string> = {
-  OWNER: "Владелец",
-  ACCOUNTANT: "Бухгалтер",
-  PROJECT_MANAGER: "Менеджер проекта",
-};
-
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const quickActions = quickActionsForRole(user?.role);
+  const sections = sectionsForRole(user?.role);
   const router = useRouter();
 
   const initials = user?.displayName
@@ -52,7 +53,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      {canMutate && (
+      {quickActions.length > 0 && (
         <div className="px-3 pt-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -62,7 +63,7 @@ export function Sidebar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              {QUICK_ACTIONS.map((action) => {
+              {quickActions.map((action) => {
                 const tone = QUICK_ACTION_TONE_CLASSES[action.tone];
                 return (
                   <DropdownMenuItem key={action.href} onSelect={() => router.push(action.href)}>
@@ -78,7 +79,7 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
         {NAV_GROUP_ORDER.map((group) => {
-          const items = SECTIONS.filter((item) => item.group === group);
+          const items = sections.filter((item) => item.group === group);
           if (items.length === 0) return null;
           return (
             <div key={group} className="space-y-0.5">

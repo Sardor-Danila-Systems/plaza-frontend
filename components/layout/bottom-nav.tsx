@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
-import { BOTTOM_NAV_LEFT, BOTTOM_NAV_RIGHT } from "@/lib/nav/config";
+import { bottomNavForRole, quickActionsForRole } from "@/lib/nav/config";
 import { QuickActionSheet } from "@/components/layout/quick-action-sheet";
 import { MoreSheet } from "@/components/layout/more-sheet";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
 
 function NavLink({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType }) {
   const pathname = usePathname();
@@ -28,11 +27,12 @@ function NavLink({ href, label, icon: Icon }: { href: string; label: string; ico
 
 export function BottomNav() {
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = quickActionsForRole(user?.role).length > 0;
+  const { left, right, showMore } = bottomNavForRole(user?.role);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      {BOTTOM_NAV_LEFT.map((item) => (
+      {left.map((item) => (
         <NavLink key={item.href} {...item} />
       ))}
 
@@ -44,10 +44,10 @@ export function BottomNav() {
         <div className="flex-1" />
       )}
 
-      {BOTTOM_NAV_RIGHT.map((item) => (
+      {right.map((item) => (
         <NavLink key={item.href} {...item} />
       ))}
-      <MoreSheet />
+      {showMore && <MoreSheet />}
     </nav>
   );
 }

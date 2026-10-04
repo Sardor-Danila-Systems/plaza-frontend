@@ -24,7 +24,8 @@ import { formatBusinessDate } from "@/lib/format/date";
 import { useProject } from "@/lib/project/project-context";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
-import { QUICK_ACTIONS, QUICK_ACTION_TONE_CLASSES } from "@/lib/nav/config";
+import { QUICK_ACTION_TONE_CLASSES, quickActionsForRole } from "@/lib/nav/config";
+import { CASH_ACCOUNTS, CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
   INCOME: "Доход",
@@ -68,8 +69,14 @@ export default function DashboardPage() {
       />
 
       <StatRow>
-        <Stat label="Касса, сум" isLoading={balanceLoading} value={formatMoney(balance?.uzs ?? "0", "UZS")} />
-        <Stat label="Касса, USD" isLoading={balanceLoading} value={formatMoney(balance?.usd ?? "0", "USD")} />
+        {CASH_ACCOUNTS.map((acc) => (
+          <Stat
+            key={acc}
+            label={CASH_ACCOUNT_LABELS[acc]}
+            isLoading={balanceLoading}
+            value={formatMoney(balance?.byAccount.find((b) => b.account === acc)?.uzs ?? "0", "UZS")}
+          />
+        ))}
         <Stat
           label="Долг поставщикам"
           isLoading={summaryLoading}
@@ -92,7 +99,7 @@ export default function DashboardPage() {
             Быстрые действия
           </p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            {QUICK_ACTIONS.map((action) => {
+            {quickActionsForRole(user?.role).map((action) => {
               const tone = QUICK_ACTION_TONE_CLASSES[action.tone];
               return (
                 <Link

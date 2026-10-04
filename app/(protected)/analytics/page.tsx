@@ -23,7 +23,8 @@ import { useMaterials, useInventoryBalances } from "@/lib/query/hooks/use-invent
 import { useBlocks, useFloors } from "@/lib/query/hooks/use-construction";
 import { usePurchases } from "@/lib/query/hooks/use-purchases";
 import { useFinanceList } from "@/lib/query/hooks/use-finance";
-import { useCombinedCash } from "@/lib/query/hooks/use-combined-cash";
+import { useFinanceBalance } from "@/lib/query/hooks/use-finance";
+import { CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 import { formatMoney, formatMoneyAbbrev, formatNumberAbbrev, formatQuantity } from "@/lib/format/decimal";
 import { todayBusinessDate, toExclusiveEndDate } from "@/lib/format/date";
 import { useProject } from "@/lib/project/project-context";
@@ -191,7 +192,7 @@ function SummaryTab({
   dateTo: string;
 }) {
   const { data, isLoading, isError, error, refetch } = useAnalyticsSummary(filters);
-  const combinedCash = useCombinedCash();
+  const { data: balance } = useFinanceBalance();
   const { data: lowStock } = useInventoryBalances({ lowStock: true });
 
   const prevRange = previousPeriod(dateFrom, dateTo);
@@ -270,15 +271,14 @@ function SummaryTab({
     .sort((a, b) => b.value - a.value)
     .filter((c) => c.value > 0);
 
-  const usdAsUzs = combinedCash.rate ? new Decimal(combinedCash.usdCash).times(combinedCash.rate) : null;
-  const compositionDataRaw = usdAsUzs
-    ? [
-        { name: "UZS", value: Number(combinedCash.uzsCash), fill: "var(--color-primary)" },
-        { name: "USD в сум", value: usdAsUzs.toNumber(), fill: "var(--color-gold)" },
-      ]
-    : null;
-  const compositionData =
-    compositionDataRaw && compositionDataRaw.some((d) => d.value > 0) ? compositionDataRaw : null;
+  // Where the money sits right now: the safe vs. the bank account.
+  const ACCOUNT_FILLS = { CASH: "var(--color-primary)", BANK: "var(--color-gold)" } as const;
+  const compositionDataRaw = (balance?.byAccount ?? []).map((b) => ({
+    name: CASH_ACCOUNT_LABELS[b.account],
+    value: Number(b.uzs) || 0,
+    fill: ACCOUNT_FILLS[b.account],
+  }));
+  const compositionData = compositionDataRaw.some((d) => d.value > 0) ? compositionDataRaw : null;
 
   const expenseGrowthPct =
     hasPrev && Number(prevData.cashUzs.periodOutflow) > 0
@@ -300,11 +300,7 @@ function SummaryTab({
       <StatRow>
         <Stat
           label="Касса"
-          value={
-            combinedCash.rate || combinedCash.totalUzs
-              ? formatMoney(combinedCash.totalUzs, "UZS")
-              : formatMoney(data.cashUzs.current, "UZS")
-          }
+          value={formatMoney(data.cashUzs.current, "UZS")}
         />
         <Stat label="Приход" tone="positive" value={`+${formatMoney(data.cashUzs.periodInflow, "UZS")}`} />
         <Stat label="Расход" tone="negative" value={`−${formatMoney(data.cashUzs.periodOutflow, "UZS")}`} />
@@ -467,14 +463,14 @@ function SummaryTab({
         {compositionData ? (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Состав общей кассы</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Касса по счетам</CardTitle>
             </CardHeader>
             <CardContent>
               <ChartContainer config={flowChartConfig} className="aspect-auto h-32 w-full">
                 <BarChart data={compositionData} layout="vertical" margin={{ left: 8, right: 8 }}>
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" />
                   <XAxis type="number" tickFormatter={(v) => formatMoneyAbbrev(v, "UZS")} tick={{ fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={84} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={112} />
                   <ChartTooltip
                     content={<ChartTooltipContent formatter={(value) => formatMoney(String(value), "UZS")} />}
                   />
@@ -485,18 +481,15 @@ function SummaryTab({
                   </Bar>
                 </BarChart>
               </ChartContainer>
-              <p className="mt-1 text-xs text-muted-foreground">
-                USD переведён в сум по курсу: 1 USD = {formatMoney(combinedCash.rate, "UZS")}
-              </p>
             </CardContent>
           </Card>
         ) : (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Состав общей кассы</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Касса по счетам</CardTitle>
             </CardHeader>
             <CardContent>
-              <EmptyState icon={BarChart3} title="Нет данных для расчёта" description="Задайте курс USD/UZS в кассе" />
+              <EmptyState icon={BarChart3} title="Касса пуста" description="Ни на одном счёте нет денег" />
             </CardContent>
           </Card>
         )}

@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
+  CashAccount,
   Currency,
   Supplier,
   SupplierAdvance,
@@ -34,6 +35,8 @@ export interface ListSuppliersFilters {
 
 export interface CreateSupplierAdvanceInput {
   currency: Currency;
+  /** Cash account paying (default CASH). */
+  account?: CashAccount;
   amount: string;
   exchangeRate?: string;
   currencyRateId?: string;
@@ -45,6 +48,8 @@ export interface CreateSupplierAdvanceInput {
 export interface CreateDebtPaymentInput {
   purchaseId: string;
   currency: Currency;
+  /** Cash account paying (default CASH). */
+  account?: CashAccount;
   amount: string;
   exchangeRate?: string;
   currencyRateId?: string;

@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { SECTIONS, QUICK_ACTIONS } from "@/lib/nav/config";
+import { quickActionsForRole, sectionsForRole } from "@/lib/nav/config";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
 
 /** Real ⌘K / Ctrl+K navigation — jumps to an existing section or quick
  * action. Intentionally does not pretend to search entity data (suppliers,
@@ -18,7 +17,7 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const router = useRouter();
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const role = user?.role;
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -37,15 +36,18 @@ export function CommandPalette() {
   }
 
   const items = useMemo(() => {
-    const nav = SECTIONS.map((s) => ({ href: s.href, label: s.label, icon: s.icon, kind: "Раздел" }));
-    const actions = canMutate
-      ? QUICK_ACTIONS.map((a) => ({ href: a.href, label: a.label, icon: a.icon, kind: "Действие" }))
-      : [];
+    const nav = sectionsForRole(role).map((s) => ({ href: s.href, label: s.label, icon: s.icon, kind: "Раздел" }));
+    const actions = quickActionsForRole(role).map((a) => ({
+      href: a.href,
+      label: a.label,
+      icon: a.icon,
+      kind: "Действие",
+    }));
     const all = [...nav, ...actions];
     if (!query.trim()) return all;
     const q = query.trim().toLowerCase();
     return all.filter((i) => i.label.toLowerCase().includes(q));
-  }, [query, canMutate]);
+  }, [query, role]);
 
   function go(href: string) {
     setOpen(false);

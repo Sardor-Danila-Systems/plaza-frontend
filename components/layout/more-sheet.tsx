@@ -4,14 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
-import { SECTIONS, MORE_ICON as MoreIcon } from "@/lib/nav/config";
+import { BOTTOM_NAV_PINNED, MORE_ICON as MoreIcon, sectionsForRole } from "@/lib/nav/config";
+import { useAuth } from "@/lib/auth/auth-provider";
 import { cn } from "cn";
 
 export function MoreSheet() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  // Everything not already pinned in the bottom nav (dashboard/finance/warehouses).
-  const items = SECTIONS.filter((s) => !["/dashboard", "/finance", "/warehouses"].includes(s.href));
+  const { user } = useAuth();
+  // Everything the role may open that isn't already pinned in the bottom nav.
+  const items = sectionsForRole(user?.role).filter((s) => !BOTTOM_NAV_PINNED.includes(s.href));
 
   return (
     <>

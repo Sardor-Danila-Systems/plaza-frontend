@@ -1,4 +1,6 @@
 import type { LucideIcon } from "lucide-react";
+import type { Role } from "@/lib/api/types";
+import { canMutateProject, canPostCash, isPathAllowed } from "@/lib/auth/permissions";
 import {
   LayoutDashboard,
   Wallet,
@@ -70,9 +72,32 @@ export const NAV_GROUP_ORDER: NavGroup[] = [
   "OBJECTS",
 ];
 
-/** The 5-item mobile bottom nav — a subset of SECTIONS plus the quick-action "+". */
-export const BOTTOM_NAV_LEFT: NavItem[] = [SECTIONS[0], SECTIONS[1]];
-export const BOTTOM_NAV_RIGHT: NavItem[] = [SECTIONS[3]];
+/** The sections a role may open — a cashier's is just Касса and their own
+ * profile. Every nav surface (sidebar, bottom nav, "Ещё", ⌘K) filters
+ * through this, so no surface can offer a section the role is denied. */
+export function sectionsForRole(role: Role | undefined): NavItem[] {
+  return SECTIONS.filter((s) => isPathAllowed(role, s.href));
+}
+
+const PROFILE_SECTION = SECTIONS.find((s) => s.href === "/profile")!;
+
+/** The mobile bottom nav — a subset of SECTIONS plus the quick-action "+".
+ * A cashier has only two places to go, so both are pinned and there is no
+ * "Ещё" sheet at all. */
+export function bottomNavForRole(role: Role | undefined): {
+  left: NavItem[];
+  right: NavItem[];
+  showMore: boolean;
+} {
+  if (role === "CASHIER") {
+    return { left: [SECTIONS[1]], right: [PROFILE_SECTION], showMore: false };
+  }
+  return { left: [SECTIONS[0], SECTIONS[1]], right: [SECTIONS[3]], showMore: true };
+}
+
+/** Hrefs pinned in the bottom nav, which the "Ещё" sheet leaves out. */
+export const BOTTOM_NAV_PINNED = ["/dashboard", "/finance", "/warehouses"];
+
 export const MORE_ICON = MoreHorizontal;
 
 /** Tailwind color token name (matches app/globals.css's `--color-*`
@@ -88,8 +113,9 @@ export interface QuickAction {
   tone: QuickActionTone;
 }
 
-/** Central "+" quick actions — all are mutations, so only ever shown to
- * PROJECT_MANAGER (see lib/auth/permissions.ts). */
+/** Central "+" quick actions — all are mutations. Use
+ * `quickActionsForRole`, never this list directly: a cashier gets only the
+ * cash operations, read-only roles get none. */
 export const QUICK_ACTIONS: QuickAction[] = [
   { href: "/finance/new?type=INCOME", label: "Доход", icon: ArrowDownCircle, tone: "success" },
   { href: "/finance/new?type=EXPENSE", label: "Расход", icon: ArrowUpCircle, tone: "destructive" },
@@ -114,3 +140,15 @@ export const QUICK_ACTION_TONE_CLASSES: Record<QuickActionTone, { bg: string; ic
   "chart-5": { bg: "bg-chart-5/10", icon: "text-chart-5" },
   warning: { bg: "bg-warning/15", icon: "text-warning-foreground" },
 };
+
+const CASH_QUICK_ACTION_HREFS = new Set([
+  "/finance/new?type=INCOME",
+  "/finance/new?type=EXPENSE",
+  "/finance/new?type=SALARY",
+]);
+
+export function quickActionsForRole(role: Role | undefined): QuickAction[] {
+  if (canMutateProject(role)) return QUICK_ACTIONS;
+  if (canPostCash(role)) return QUICK_ACTIONS.filter((a) => CASH_QUICK_ACTION_HREFS.has(a.href));
+  return [];
+}

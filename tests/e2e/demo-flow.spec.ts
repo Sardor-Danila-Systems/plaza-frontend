@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Browser, type APIRequestContext } from "@playwright/test";
+import { test, expect, type Page, type Browser } from "@playwright/test";
 
 /**
  * End-to-end coverage of the primary demo lifecycle against a REAL running
@@ -31,27 +31,6 @@ async function selectByLabelId(page: Page, labelId: string, optionName: string |
   await page.locator(`button[aria-labelledby="${labelId}"]`).click();
   const exact = typeof optionName === "string";
   await page.getByRole("option", { name: optionName, exact }).click();
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-
-/** Guarantees at least one USD currency rate exists so the "Курс из
- * списка" (referenced-rate) Select has a real option to test — talks to
- * the backend directly (not through the browser) since no UI exists to
- * add a rate, only to consume one. Ignored if one already exists for
- * today (unique-per-day constraint). */
-async function ensureUsdRate(request: APIRequestContext) {
-  const loginRes = await request.post(`${API_URL}/auth/login`, {
-    data: { email: MANAGER.email, password: MANAGER.password },
-  });
-  const { accessToken, user } = await loginRes.json();
-  if (!user.projectId) return;
-  await request
-    .post(`${API_URL}/projects/${user.projectId}/currency-rates`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      data: { currency: "USD", rateUzs: "12450.00000000", effectiveOn: new Date().toISOString().slice(0, 10) },
-    })
-    .catch(() => {});
 }
 
 test.describe("auth", () => {
@@ -201,7 +180,12 @@ test.describe("core business flow (PROJECT_MANAGER)", () => {
     await dlg.getByLabel("Код (латиницей)").fill(`pw-mat-${suffix}`);
     await dlg.getByPlaceholder("Новая категория").fill(`Playwright Category ${suffix}`);
     await dlg.getByRole("button", { name: "Создать" }).first().click();
-    await page.waitForTimeout(400);
+    // Wait for the category to actually exist and be selected, not a fixed
+    // delay — under load a 400ms sleep left the submit button disabled.
+    await expect(dlg.locator('button[aria-labelledby="material-category-label"]')).not.toHaveText(
+      /Выберите категорию|Категорий ещё нет/,
+      { timeout: 10000 },
+    );
     await dlg.getByText("Выберите единицу").click();
     await page.getByRole("option").first().click();
     await dlg.getByRole("button", { name: "Создать" }).last().click();
@@ -559,7 +543,12 @@ test.describe("creating master data from inside the purchase form", () => {
     await expect(dlg.getByLabel("Код (латиницей)")).toHaveValue(/inline-material-\d+/);
     await dlg.getByPlaceholder("Новая категория").fill(`Inline Category ${suffix}`);
     await dlg.getByRole("button", { name: "Создать" }).first().click();
-    await page.waitForTimeout(400);
+    // Wait for the category to actually exist and be selected, not a fixed
+    // delay — under load a 400ms sleep left the submit button disabled.
+    await expect(dlg.locator('button[aria-labelledby="material-category-label"]')).not.toHaveText(
+      /Выберите категорию|Категорий ещё нет/,
+      { timeout: 10000 },
+    );
     await dlg.getByText("Выберите единицу").click();
     await page.getByRole("option").first().click();
     await dlg.getByRole("button", { name: "Создать" }).last().click();
@@ -635,61 +624,118 @@ test.describe("quick-action routing regression", () => {
   });
 });
 
-test.describe("exchange-rate select (vaul drawer)", () => {
-  test("referenced-rate dropdown opens and an option is selectable inside the mobile advance drawer; manual entry still works", async ({
-    page,
-    request,
-  }) => {
-    await ensureUsdRate(request);
+const CASHIER = {
+  email: "cashier@euro-plaza.example",
+  password: process.env.SEED_CASHIER_PASSWORD ?? "ChangeMe123!DevOnly",
+};
+
+test.describe("two cash accounts", () => {
+  // One session for the whole block: the API allows 50 logins a minute per
+  // IP, and the full suite already sits close to that.
+  test.describe.configure({ mode: "serial" });
+  let page: Page;
+
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
+    page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await login(page, MANAGER);
+  });
 
-    const suffix = Date.now().toString().slice(-6);
-    const supplierName = `Playwright Rate Supplier ${suffix}`;
-    await page.goto("/suppliers");
-    await page.click('button:has-text("Добавить")');
-    await page.fill("#supplier-name", supplierName);
-    await page.locator("form button[type=submit]").click();
-    await page.waitForTimeout(600);
-    await page.click(`text=${supplierName}`);
-    await page.waitForURL(/\/suppliers\/[a-f0-9-]+$/);
+  test.afterAll(async () => {
+    await page.close();
+  });
 
-    await page.click('button:has-text("Аванс")');
-    await page.locator('button[aria-label="Валюта"]').click();
-    await page.getByRole("option", { name: "USD", exact: true }).click();
+  test("money lands in the chosen account and each balance is shown on its own", async () => {
+    await page.goto("/finance");
+    const bankStat = page.locator("div", { hasText: /^Банковский счёт/ }).last();
+    const before = (await bankStat.textContent()) ?? "";
 
-    // The bug: this Select visually looked like a dropdown, but its
-    // options weren't clickable because vaul's drawer-drag recognizer
-    // intercepted the pointer. Regression guard: open it and click a real
-    // option (data-vaul-no-drag fix in components/ui/select.tsx).
-    await page.getByText("Выберите курс", { exact: true }).click();
-    await page.getByRole("option").first().click();
-    await expect(page.getByText("Выберите курс", { exact: true })).toHaveCount(0);
+    await page.goto("/finance/new?type=INCOME");
+    await page.fill("#amount", "250000");
+    await page.getByRole("tab", { name: "Банковский счёт" }).click();
+    await page.locator("button[type=submit]").click();
+    await page.waitForURL(/\/finance\/[a-f0-9-]+$/, { timeout: 15000 });
+    // The detail page names the account the money went to.
+    await expect(page.getByText("Банковский счёт")).toBeVisible();
 
-    // Manual entry remains available as an explicit alternative.
-    await page.getByText("Свой курс", { exact: true }).click();
-    const manualRateInput = page.getByPlaceholder("Курс, сум за 1 USD");
-    await manualRateInput.fill("12500");
-    await page.getByPlaceholder("Причина ручного ввода курса").fill("Playwright manual rate check");
-    // DecimalInput groups digits for display; the submitted value stays raw.
-    await expect(manualRateInput).toHaveValue("12 500");
+    await page.goto("/finance");
+    await expect(page.getByText("Всего", { exact: true })).toBeVisible();
+    await expect(page.getByText("Наличные", { exact: true }).first()).toBeVisible();
+    await expect(bankStat).not.toHaveText(before, { timeout: 10000 });
+  });
+
+  test("the form offers сум only — no currency or exchange-rate controls", async () => {
+    await page.goto("/finance/new?type=EXPENSE");
+    await expect(page.getByText("Сумма, сум")).toBeVisible();
+    await expect(page.getByRole("option", { name: "USD" })).toHaveCount(0);
+    await expect(page.getByText(/курс/i)).toHaveCount(0);
+  });
+
+  test("spending more than one account holds is refused with a readable message", async () => {
+    await page.goto("/finance/new?type=EXPENSE");
+    await page.fill("#amount", "999999999999");
+    await page.getByRole("tab", { name: "Наличные" }).click();
+    await page.locator("button[type=submit]").click();
+    await expect(page.getByText("Недостаточно средств в выбранной кассе.")).toBeVisible({ timeout: 10000 });
   });
 });
 
-test.describe("combined cash view", () => {
-  test("shows a UZS/USD toggle and a computed total or an explicit manual-rate prompt, never a stuck blank state", async ({
-    page,
-    request,
-  }) => {
-    await ensureUsdRate(request);
-    await login(page, MANAGER);
-    await page.goto("/finance");
+test.describe("cashier (Касса only)", () => {
+  test.describe.configure({ mode: "serial" });
+  let page: Page;
 
-    await expect(page.getByText("Общая касса")).toBeVisible();
-    await expect(page.getByText(/По курсу: 1 USD =|Курс USD\/UZS ещё не задан/)).toBeVisible({ timeout: 10000 });
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
+    page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  });
 
-    const usdToggle = page.getByRole("button", { name: "USD", exact: true }).first();
-    await usdToggle.click();
-    await expect(page.getByText("$").first()).toBeVisible();
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test("lands in Касса and sees no other section", async () => {
+    await page.goto("/login");
+    await page.fill("#email", CASHIER.email);
+    await page.fill("#password", CASHIER.password);
+    await page.click("button[type=submit]");
+    // A cashier's home is Касса, not the dashboard they cannot open.
+    await page.waitForURL("**/finance", { timeout: 15000 });
+
+    // The bottom nav carries only Касса and Профиль — no "Ещё" sheet,
+    // nothing for suppliers, the warehouse or objects.
+    const nav = page.locator("nav").last();
+    await expect(nav.getByText("Касса")).toBeVisible();
+    await expect(nav.getByText("Профиль")).toBeVisible();
+    await expect(nav.getByText("Склады")).toHaveCount(0);
+    await expect(nav.getByText("Ещё")).toHaveCount(0);
+
+    // Quick actions are the three cash operations only.
+    await page.locator('button[aria-label="Новая операция"]').click();
+    const sheet = page.locator("[role=dialog], [data-slot=drawer-content]").last();
+    await expect(sheet.getByRole("button", { name: "Доход" })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Закупка" })).toHaveCount(0);
+    await expect(sheet.getByRole("button", { name: "Списание" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+  });
+
+  test("an old link to another section sends them back to Касса", async () => {
+    for (const path of ["/suppliers", "/purchases/new", "/warehouses", "/settings/construction", "/dashboard"]) {
+      await page.goto(path);
+      await page.waitForURL("**/finance", { timeout: 15000 });
+    }
+  });
+
+  test("posts a salary from the cash account", async () => {
+    // Fund the cash account first so the salary has something to draw on.
+    await page.goto("/finance/new?type=INCOME");
+    await page.fill("#amount", "500000");
+    await page.locator("button[type=submit]").click();
+    await page.waitForURL(/\/finance\/[a-f0-9-]+$/, { timeout: 15000 });
+
+    await page.goto("/finance/new?type=SALARY");
+    await page.fill("#amount", "120000");
+    await page.fill("#party", "Рабочий бригады");
+    await page.locator("button[type=submit]").click();
+    await page.waitForURL(/\/finance\/[a-f0-9-]+$/, { timeout: 15000 });
+    await expect(page.getByText("Наличные")).toBeVisible();
   });
 });
 

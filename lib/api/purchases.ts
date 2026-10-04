@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
+  CashAccount,
   AdvanceAllocationInput,
   Currency,
   Paginated,
@@ -11,6 +12,8 @@ export interface CreatePurchaseInput {
   supplierId: string;
   warehouseId: string;
   currency: Currency;
+  /** Cash account paying (default CASH). */
+  account?: CashAccount;
   exchangeRate?: string;
   currencyRateId?: string;
   rateOverrideReason?: string;

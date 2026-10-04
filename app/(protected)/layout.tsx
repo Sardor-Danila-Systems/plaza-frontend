@@ -1,22 +1,32 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth/auth-provider";
+import { homePathForRole, isPathAllowed } from "@/lib/auth/permissions";
 import { ProjectProvider, useProject } from "@/lib/project/project-context";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { BottomNav } from "@/components/layout/bottom-nav";
 
 function Gate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, status } = useAuth();
+  const { isAuthenticated, status, user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  // A section the role may not open (a cashier following an old link to
+  // /suppliers, say) would only render a wall of 403 errors — send them
+  // home instead. The backend still enforces this regardless.
+  const allowed = isPathAllowed(user?.role, pathname);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
   }, [status, router]);
 
-  if (!isAuthenticated) {
+  useEffect(() => {
+    if (isAuthenticated && !allowed) router.replace(homePathForRole(user?.role));
+  }, [isAuthenticated, allowed, user?.role, router]);
+
+  if (!isAuthenticated || !allowed) {
     return (
       <div className="flex min-h-dvh items-center justify-center text-sm text-muted-foreground">
         Загрузка…

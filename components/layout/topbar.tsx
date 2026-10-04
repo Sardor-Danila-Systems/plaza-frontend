@@ -7,12 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ProjectSwitcher } from "@/components/layout/project-switcher";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { useAuth } from "@/lib/auth/auth-provider";
-
-const ROLE_LABELS: Record<string, string> = {
-  OWNER: "Владелец",
-  ACCOUNTANT: "Бухгалтер",
-  PROJECT_MANAGER: "Менеджер проекта",
-};
+import { ROLE_LABELS } from "@/lib/auth/permissions";
 
 export function Topbar() {
   const { user, logout } = useAuth();
