@@ -45,9 +45,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-muted/30 px-4">
       <div className="mb-8 flex flex-col items-center gap-2 text-center">
-        <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground font-semibold">
-          EP
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="" className="size-16 object-contain" />
         <h1 className="text-lg font-semibold">Euro Plaza</h1>
         <p className="text-sm text-muted-foreground">Система управления проектами</p>
       </div>

@@ -40,9 +40,8 @@ export function Sidebar() {
   return (
     <aside className="hidden h-full w-64 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar md:flex">
       <div className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border px-5">
-        <div className="flex size-7 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
-          EP
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="" className="size-8 shrink-0 object-contain" />
         <span className="text-[15px] font-semibold tracking-tight text-sidebar-foreground">Euro Plaza</span>
       </div>
 
