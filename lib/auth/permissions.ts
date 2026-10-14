@@ -17,7 +17,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 /** Anything outside the cash ledger: suppliers, purchases, the warehouse,
  * construction objects. */
 export function canMutateProject(role: Role | undefined): boolean {
-  return role === "PROJECT_MANAGER" || role === "DEVELOPER";
+  return role === "PROJECT_MANAGER" || role === "DEVELOPER" || role === "OWNER";
 }
 
 /** Posting, cancelling and commenting on cash operations (Касса). */

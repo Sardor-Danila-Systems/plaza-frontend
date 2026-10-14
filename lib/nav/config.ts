@@ -106,8 +106,8 @@ export interface QuickAction {
 }
 
 /** Central "+" quick actions — all are mutations. Use
- * `quickActionsForRole`, never this list directly: a cashier gets only the
- * cash operations, read-only roles get none. */
+ * `quickActionsForRole`, never this list directly: the owner gets only the
+ * actions of its sections, read-only roles get none. */
 export const QUICK_ACTIONS: QuickAction[] = [
   { href: "/finance/new?type=INCOME", label: "Приход", icon: ArrowDownCircle, tone: "success" },
   { href: "/finance/new?type=EXPENSE", label: "Расход", icon: ArrowUpCircle, tone: "destructive" },
@@ -134,6 +134,7 @@ export const QUICK_ACTION_TONE_CLASSES: Record<QuickActionTone, { bg: string; ic
 };
 
 export function quickActionsForRole(role: Role | undefined): QuickAction[] {
-  if (canMutateProject(role)) return QUICK_ACTIONS;
-  return [];
+  if (!canMutateProject(role)) return [];
+  // The owner is offered only some sections, so only their actions.
+  return QUICK_ACTIONS.filter((a) => isPathAllowed(role, a.href.split("?")[0]));
 }
