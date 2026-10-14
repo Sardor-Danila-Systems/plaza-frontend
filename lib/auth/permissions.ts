@@ -11,7 +11,6 @@ export const ROLE_LABELS: Record<Role, string> = {
   OWNER: "Владелец",
   ACCOUNTANT: "Бухгалтер",
   PROJECT_MANAGER: "Менеджер проекта",
-  CASHIER: "Кассир",
   DEVELOPER: "Разработчик",
 };
 
@@ -23,24 +22,19 @@ export function canMutateProject(role: Role | undefined): boolean {
 
 /** Posting, cancelling and commenting on cash operations (Касса). */
 export function canPostCash(role: Role | undefined): boolean {
-  return role === "PROJECT_MANAGER" || role === "CASHIER" || role === "DEVELOPER";
+  return canMutateProject(role);
 }
 
-/** A cashier works in Касса only — every other section is closed to them
- * server-side, so the UI does not offer it at all. */
-export function isCashOnly(role: Role | undefined): boolean {
-  return role === "CASHIER";
-}
+/** Where a user lands after login, and where they are sent back to from a
+ * section they may not open. */
+export const HOME_PATH = "/dashboard";
 
-/** Where a role lands after login, and where it is sent back to from a
- * section it may not open. */
-export function homePathForRole(role: Role | undefined): string {
-  return isCashOnly(role) ? "/finance" : "/dashboard";
-}
-
-const CASH_ONLY_PATHS = ["/finance", "/profile"];
+/** The owner sees only these sections (read-only); every other role may
+ * open all of them. The backend still allows the owner to read everything,
+ * so this is a deliberate UI narrowing, not a security boundary. */
+const OWNER_PATHS = ["/dashboard", "/finance", "/suppliers", "/purchases", "/history", "/settings/construction", "/profile"];
 
 export function isPathAllowed(role: Role | undefined, pathname: string): boolean {
-  if (!isCashOnly(role)) return true;
-  return CASH_ONLY_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (role !== "OWNER") return true;
+  return OWNER_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }

@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/api/types";
-import { canMutateProject, canPostCash, isPathAllowed } from "@/lib/auth/permissions";
+import { canMutateProject, isPathAllowed } from "@/lib/auth/permissions";
 import {
   LayoutDashboard,
   Wallet,
@@ -79,24 +79,16 @@ export function sectionsForRole(role: Role | undefined): NavItem[] {
   return SECTIONS.filter((s) => isPathAllowed(role, s.href));
 }
 
-const PROFILE_SECTION = SECTIONS.find((s) => s.href === "/profile")!;
-
 /** The mobile bottom nav — a subset of SECTIONS plus the quick-action "+".
- * A cashier has only two places to go, so both are pinned and there is no
- * "Ещё" sheet at all. */
+ * The owner has no warehouse section, so Закупки takes its slot. */
 export function bottomNavForRole(role: Role | undefined): {
   left: NavItem[];
   right: NavItem[];
   showMore: boolean;
 } {
-  if (role === "CASHIER") {
-    return { left: [SECTIONS[1]], right: [PROFILE_SECTION], showMore: false };
-  }
-  return { left: [SECTIONS[0], SECTIONS[1]], right: [SECTIONS[3]], showMore: true };
+  const right = isPathAllowed(role, "/warehouses") ? SECTIONS[3] : SECTIONS[5];
+  return { left: [SECTIONS[0], SECTIONS[1]], right: [right], showMore: true };
 }
-
-/** Hrefs pinned in the bottom nav, which the "Ещё" sheet leaves out. */
-export const BOTTOM_NAV_PINNED = ["/dashboard", "/finance", "/warehouses"];
 
 export const MORE_ICON = MoreHorizontal;
 
@@ -141,14 +133,7 @@ export const QUICK_ACTION_TONE_CLASSES: Record<QuickActionTone, { bg: string; ic
   warning: { bg: "bg-warning/15", icon: "text-warning-foreground" },
 };
 
-const CASH_QUICK_ACTION_HREFS = new Set([
-  "/finance/new?type=INCOME",
-  "/finance/new?type=EXPENSE",
-  "/finance/new?type=SALARY",
-]);
-
 export function quickActionsForRole(role: Role | undefined): QuickAction[] {
   if (canMutateProject(role)) return QUICK_ACTIONS;
-  if (canPostCash(role)) return QUICK_ACTIONS.filter((a) => CASH_QUICK_ACTION_HREFS.has(a.href));
   return [];
 }

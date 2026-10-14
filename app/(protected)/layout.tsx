@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth/auth-provider";
-import { homePathForRole, isPathAllowed } from "@/lib/auth/permissions";
+import { HOME_PATH, isPathAllowed } from "@/lib/auth/permissions";
 import { ProjectProvider, useProject } from "@/lib/project/project-context";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -23,7 +23,7 @@ function Gate({ children }: { children: React.ReactNode }) {
   }, [status, router]);
 
   useEffect(() => {
-    if (isAuthenticated && !allowed) router.replace(homePathForRole(user?.role));
+    if (isAuthenticated && !allowed) router.replace(HOME_PATH);
   }, [isAuthenticated, allowed, user?.role, router]);
 
   if (!isAuthenticated || !allowed) {
