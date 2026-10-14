@@ -35,7 +35,7 @@ export default function LoginPage() {
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     try {
-      const user = await login(values.email, values.password);
+      await login(values.email, values.password);
       router.replace(HOME_PATH);
     } catch (error) {
       setServerError(getErrorMessage(error));
