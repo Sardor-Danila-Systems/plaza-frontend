@@ -3,8 +3,9 @@
 // Money/quantity/rate fields are decimal strings end to end — never parsed
 // into JS `number` for accounting arithmetic. See lib/format/decimal.ts.
 
-/** CASHIER runs one project's cash ledger (Касса) and sees nothing else. */
-export type Role = "OWNER" | "ACCOUNTANT" | "PROJECT_MANAGER" | "CASHIER";
+/** CASHIER runs one project's cash ledger (Касса) and sees nothing else.
+ * DEVELOPER is the support account: full read and write on every project. */
+export type Role = "OWNER" | "ACCOUNTANT" | "PROJECT_MANAGER" | "CASHIER" | "DEVELOPER";
 
 /** The project's two cash accounts. Every balance and every
  * "insufficient cash" check is per account. */

@@ -39,6 +39,41 @@ export function useFinanceCategories() {
   });
 }
 
+export function useCurrencyRates() {
+  const { projectId } = useProject();
+  return useQuery({
+    queryKey: qk.finance.currencyRates(projectId!),
+    queryFn: () => financesApi.currencyRates(projectId!),
+    enabled: !!projectId,
+  });
+}
+
+/** Live USD/UZS quote from the Central Bank of Uzbekistan. Backend caches
+ * it ~45min server-side; `staleTime` here just avoids redundant refetches
+ * within the same browsing session. */
+export function useLiveCurrencyRate() {
+  const { projectId } = useProject();
+  return useQuery({
+    queryKey: qk.finance.liveCurrencyRate(projectId!),
+    queryFn: () => financesApi.liveCurrencyRate(projectId!),
+    enabled: !!projectId,
+    staleTime: 15 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useCreateCurrencyRate() {
+  const { projectId } = useProject();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Parameters<typeof financesApi.createCurrencyRate>[1]) =>
+      financesApi.createCurrencyRate(projectId!, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.finance.currencyRates(projectId!) });
+    },
+  });
+}
+
 export function useCreateFinanceTransaction() {
   const { projectId } = useProject();
   const queryClient = useQueryClient();

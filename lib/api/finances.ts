@@ -4,8 +4,11 @@ import type {
   CashAccount,
   CreatableTransactionType,
   Currency,
+  CurrencyRate,
   FinancialTransaction,
+  LiveCurrencyRate,
   Paginated,
+  RateSource,
   TransactionCategory,
 } from "@/lib/api/types";
 
@@ -76,6 +79,21 @@ export const financesApi = {
     body: { name: string; kind: TransactionCategory["kind"] },
   ) =>
     apiFetch<TransactionCategory>(`/projects/${projectId}/transaction-categories`, {
+      method: "POST",
+      body,
+    }),
+
+  currencyRates: (projectId: string) =>
+    apiFetch<CurrencyRate[]>(`/projects/${projectId}/currency-rates`),
+
+  liveCurrencyRate: (projectId: string) =>
+    apiFetch<LiveCurrencyRate>(`/projects/${projectId}/currency-rates/live`),
+
+  createCurrencyRate: (
+    projectId: string,
+    body: { currency: Currency; rateUzs: string; effectiveOn: string; source?: RateSource },
+  ) =>
+    apiFetch<CurrencyRate>(`/projects/${projectId}/currency-rates`, {
       method: "POST",
       body,
     }),

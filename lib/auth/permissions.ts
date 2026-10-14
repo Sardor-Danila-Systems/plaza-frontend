@@ -12,17 +12,18 @@ export const ROLE_LABELS: Record<Role, string> = {
   ACCOUNTANT: "Бухгалтер",
   PROJECT_MANAGER: "Менеджер проекта",
   CASHIER: "Кассир",
+  DEVELOPER: "Разработчик",
 };
 
 /** Anything outside the cash ledger: suppliers, purchases, the warehouse,
  * construction objects. */
 export function canMutateProject(role: Role | undefined): boolean {
-  return role === "PROJECT_MANAGER";
+  return role === "PROJECT_MANAGER" || role === "DEVELOPER";
 }
 
 /** Posting, cancelling and commenting on cash operations (Касса). */
 export function canPostCash(role: Role | undefined): boolean {
-  return role === "PROJECT_MANAGER" || role === "CASHIER";
+  return role === "PROJECT_MANAGER" || role === "CASHIER" || role === "DEVELOPER";
 }
 
 /** A cashier works in Касса only — every other section is closed to them
