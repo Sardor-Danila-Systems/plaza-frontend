@@ -24,6 +24,7 @@ import { useBlocks, useFloors } from "@/lib/query/hooks/use-construction";
 import { usePurchases } from "@/lib/query/hooks/use-purchases";
 import { useFinanceList } from "@/lib/query/hooks/use-finance";
 import { useFinanceBalance } from "@/lib/query/hooks/use-finance";
+import { useCombinedCash } from "@/lib/query/hooks/use-combined-cash";
 import { CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 import { formatMoney, formatMoneyAbbrev, formatNumberAbbrev, formatQuantity } from "@/lib/format/decimal";
 import { todayBusinessDate, toExclusiveEndDate } from "@/lib/format/date";
@@ -193,6 +194,7 @@ function SummaryTab({
 }) {
   const { data, isLoading, isError, error, refetch } = useAnalyticsSummary(filters);
   const { data: balance } = useFinanceBalance();
+  const combinedCash = useCombinedCash();
   const { data: lowStock } = useInventoryBalances({ lowStock: true });
 
   const prevRange = previousPeriod(dateFrom, dateTo);
@@ -275,7 +277,8 @@ function SummaryTab({
   const ACCOUNT_FILLS = { CASH: "var(--color-primary)", BANK: "var(--color-gold)" } as const;
   const compositionDataRaw = (balance?.byAccount ?? []).map((b) => ({
     name: CASH_ACCOUNT_LABELS[b.account],
-    value: Number(b.uzs) || 0,
+    // USD is shown at the same rate as the combined cash figure above.
+    value: (Number(b.uzs) || 0) + (combinedCash.rate ? (Number(b.usd) || 0) * Number(combinedCash.rate) : 0),
     fill: ACCOUNT_FILLS[b.account],
   }));
   const compositionData = compositionDataRaw.some((d) => d.value > 0) ? compositionDataRaw : null;
@@ -300,7 +303,11 @@ function SummaryTab({
       <StatRow>
         <Stat
           label="Касса"
-          value={formatMoney(data.cashUzs.current, "UZS")}
+          value={
+            combinedCash.rate || combinedCash.totalUzs
+              ? formatMoney(combinedCash.totalUzs, "UZS")
+              : formatMoney(data.cashUzs.current, "UZS")
+          }
         />
         <Stat label="Приход" tone="positive" value={`+${formatMoney(data.cashUzs.periodInflow, "UZS")}`} />
         <Stat label="Расход" tone="negative" value={`−${formatMoney(data.cashUzs.periodOutflow, "UZS")}`} />

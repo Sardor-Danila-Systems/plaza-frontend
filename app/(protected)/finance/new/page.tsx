@@ -12,12 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCreateFinanceTransaction, useFinanceCategories } from "@/lib/query/hooks/use-finance";
+import { CurrencySelect, RateFields, useRateForm } from "@/components/shared/currency-rate-fields";
 import { CashAccountPicker } from "@/components/shared/cash-account-picker";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
 import { todayBusinessDate } from "@/lib/format/date";
 import { isPositiveDecimalString } from "@/lib/format/decimal";
-import type { CashAccount, CreatableTransactionType } from "@/lib/api/types";
+import type { CashAccount, CreatableTransactionType, Currency } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<CreatableTransactionType, string> = {
   INCOME: "Приход",
@@ -83,7 +84,8 @@ function FinanceForm({
   router: ReturnType<typeof useRouter>;
 }) {
   const [amount, setAmount] = useState("");
-  // The project works in сум only; the account is the one real choice.
+  const [currency, setCurrency] = useState<Currency>("UZS");
+  const rate = useRateForm();
   const [account, setAccount] = useState<CashAccount>("CASH");
   const [categoryId, setCategoryId] = useState("");
   const [party, setParty] = useState("");
@@ -106,12 +108,19 @@ function FinanceForm({
       return;
     }
 
+    const rateError = rate.validate(currency);
+    if (rateError) {
+      setFormError(rateError);
+      return;
+    }
+
     createMutation.mutate(
       {
         body: {
           type,
           amount,
-          currency: "UZS",
+          currency,
+          ...rate.body(currency),
           account,
           categoryId: categoryId || undefined,
           source: type === "INCOME" ? party || undefined : undefined,
@@ -137,16 +146,21 @@ function FinanceForm({
       {formError && <p className="text-sm text-destructive">{formError}</p>}
 
       <div className="space-y-2">
-        <Label htmlFor="amount">Сумма, сум</Label>
-        <DecimalInput
-          id="amount"
-          scale={2}
-          className="h-11"
-          value={amount}
-          onValueChange={setAmount}
-          placeholder="0.00"
-        />
+        <Label htmlFor="amount">Сумма</Label>
+        <div className="flex gap-2">
+          <DecimalInput
+            id="amount"
+            scale={2}
+            className="h-11 flex-1"
+            value={amount}
+            onValueChange={setAmount}
+            placeholder="0.00"
+          />
+          <CurrencySelect value={currency} onChange={setCurrency} />
+        </div>
       </div>
+
+      {currency === "USD" && <RateFields form={rate} />}
 
       <CashAccountPicker
         value={account}

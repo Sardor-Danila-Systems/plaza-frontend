@@ -23,7 +23,9 @@ import { useFinanceBalance, useFinanceList } from "@/lib/query/hooks/use-finance
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canPostCash } from "@/lib/auth/permissions";
 import { formatBusinessDate } from "@/lib/format/date";
-import { formatMoney } from "@/lib/format/decimal";
+import { AccountBalanceValue } from "@/components/shared/account-balance-value";
+import { CashJournalButton } from "@/components/shared/cash-journal-button";
+import { CombinedCashCard } from "@/components/shared/combined-cash-card";
 import { CASH_ACCOUNTS, CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 import type { CashAccount, FinancialTransactionType } from "@/lib/api/types";
 
@@ -62,7 +64,9 @@ export default function FinancePage() {
       <PageHeader
         title="Касса"
         actions={
-          canMutate && (
+          <div className="flex items-center gap-2">
+            <CashJournalButton account={account === "ALL" ? undefined : (account as CashAccount)} />
+            {canMutate && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm">
@@ -85,9 +89,12 @@ export default function FinancePage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          )
+            )}
+          </div>
         }
       />
+
+      <CombinedCashCard />
 
       {/* The project runs two cash accounts; money in one cannot pay from the
         * other, so each balance is shown on its own next to their total. */}
@@ -95,7 +102,7 @@ export default function FinancePage() {
         <Stat
           label="Всего"
           isLoading={balanceLoading}
-          value={formatMoney(balance?.uzs ?? "0", "UZS")}
+          value={<AccountBalanceValue balance={balance} />}
           className="col-span-2 sm:col-span-1"
         />
         {CASH_ACCOUNTS.map((acc) => (
@@ -103,7 +110,7 @@ export default function FinancePage() {
             key={acc}
             label={CASH_ACCOUNT_LABELS[acc]}
             isLoading={balanceLoading}
-            value={formatMoney(balance?.byAccount.find((b) => b.account === acc)?.uzs ?? "0", "UZS")}
+            value={<AccountBalanceValue balance={balance} account={acc} />}
           />
         ))}
       </StatRow>

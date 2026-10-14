@@ -20,7 +20,8 @@ import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
 import { todayBusinessDate } from "@/lib/format/date";
 import { formatMoney, isPositiveDecimalString, previewMultiply, previewSum } from "@/lib/format/decimal";
-import type { AdvanceAllocationInput, CashAccount, PurchaseItemInput } from "@/lib/api/types";
+import type { AdvanceAllocationInput, CashAccount, Currency, PurchaseItemInput } from "@/lib/api/types";
+import { CurrencySelect, RateFields, useRateForm } from "@/components/shared/currency-rate-fields";
 import { CashAccountPicker } from "@/components/shared/cash-account-picker";
 
 interface ItemRow extends PurchaseItemInput {
@@ -31,11 +32,14 @@ export default function NewPurchasePage() {
   const router = useRouter();
   const [supplierId, setSupplierId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
+  const [currency, setCurrency] = useState<Currency>("UZS");
+  const rate = useRateForm();
   const [items, setItems] = useState<ItemRow[]>([
     { key: crypto.randomUUID(), materialId: "", quantity: "", unitPrice: "" },
   ]);
   const [selectedAdvanceIds, setSelectedAdvanceIds] = useState<string[]>([]);
   const [advanceAmounts, setAdvanceAmounts] = useState<Record<string, string>>({});
+  const [advanceSettlementRates, setAdvanceSettlementRates] = useState<Record<string, string>>({});
   const [cashPaid, setCashPaid] = useState("");
   const [cashAccount, setCashAccount] = useState<CashAccount>("CASH");
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -56,12 +60,7 @@ export default function NewPurchasePage() {
   const createMutation = useCreatePurchase();
   const { key, renew } = useIdempotencyKey();
 
-  // The project works in сум only, so only сум advances can be applied —
-  // a historical USD advance would need a settlement rate this form no
-  // longer asks for.
-  const usableAdvances = supplierAdvances.filter(
-    (a) => a.currency === "UZS" && Number(a.availableAmount) > 0,
-  );
+  const usableAdvances = supplierAdvances.filter((a) => Number(a.availableAmount) > 0);
 
   const previewTotal = previewSum(
     items.map((i) => previewMultiply(i.quantity || "0", i.unitPrice || "0")),
@@ -101,6 +100,12 @@ export default function NewPurchasePage() {
       return;
     }
 
+    const rateError = rate.validate(currency);
+    if (rateError) {
+      setFormError(rateError);
+      return;
+    }
+
     const advanceAllocations: AdvanceAllocationInput[] = [];
     for (const advanceId of selectedAdvanceIds) {
       const amount = advanceAmounts[advanceId];
@@ -108,7 +113,17 @@ export default function NewPurchasePage() {
         setFormError("Укажите сумму для каждого выбранного аванса");
         return;
       }
-      advanceAllocations.push({ advanceId, amount });
+      const advance = usableAdvances.find((a) => a.id === advanceId)!;
+      const needsRate = advance.currency !== currency && currency !== "UZS";
+      if (needsRate && !advanceSettlementRates[advanceId]) {
+        setFormError("Укажите курс пересчёта для аванса в другой валюте");
+        return;
+      }
+      advanceAllocations.push({
+        advanceId,
+        amount,
+        ...(needsRate ? { settlementExchangeRate: advanceSettlementRates[advanceId] } : {}),
+      });
     }
 
     createMutation.mutate(
@@ -116,7 +131,8 @@ export default function NewPurchasePage() {
         body: {
           supplierId,
           warehouseId,
-          currency: "UZS",
+          currency,
+          ...rate.body(currency),
           ...(cashPaid.trim() ? { account: cashAccount } : {}),
           items: items.map(({ materialId, quantity, unitPrice }) => ({ materialId, quantity, unitPrice })),
           advanceAllocations: advanceAllocations.length > 0 ? advanceAllocations : undefined,
@@ -215,6 +231,13 @@ export default function NewPurchasePage() {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <Label id="purchase-currency-label">Валюта</Label>
+          <CurrencySelect value={currency} onChange={setCurrency} className="h-11 w-32" />
+        </div>
+
+        {currency === "USD" && <RateFields form={rate} />}
+
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Label id="purchase-materials-label">Материалы</Label>
@@ -273,13 +296,13 @@ export default function NewPurchasePage() {
               </div>
               {row.quantity && row.unitPrice && (
                 <p className="text-right text-xs text-muted-foreground">
-                  {formatMoney(previewMultiply(row.quantity, row.unitPrice), "UZS")}
+                  {formatMoney(previewMultiply(row.quantity, row.unitPrice), currency)}
                 </p>
               )}
             </div>
           ))}
           <p className="text-right text-sm font-medium">
-            Предварительный итог: {formatMoney(previewTotal, "UZS")}
+            Предварительный итог: {formatMoney(previewTotal, currency)}
           </p>
         </div>
 
@@ -288,6 +311,7 @@ export default function NewPurchasePage() {
             <Label>Использовать аванс поставщика</Label>
             {usableAdvances.map((advance) => {
               const checked = selectedAdvanceIds.includes(advance.id);
+              const needsRate = advance.currency !== currency && currency !== "UZS";
               return (
                 <div key={advance.id} className="space-y-2 rounded-md bg-muted/40 p-2">
                   <label className="flex items-center gap-2 text-sm">
@@ -307,6 +331,17 @@ export default function NewPurchasePage() {
                         value={advanceAmounts[advance.id] ?? ""}
                         onValueChange={(v) => setAdvanceAmounts((prev) => ({ ...prev, [advance.id]: v }))}
                       />
+                      {needsRate && (
+                        <DecimalInput
+                          scale={8}
+                          placeholder="Курс пересчёта"
+                          className="h-10"
+                          value={advanceSettlementRates[advance.id] ?? ""}
+                          onValueChange={(v) =>
+                            setAdvanceSettlementRates((prev) => ({ ...prev, [advance.id]: v }))
+                          }
+                        />
+                      )}
                     </div>
                   )}
                 </div>

@@ -25,6 +25,8 @@ import { useProject } from "@/lib/project/project-context";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
 import { QUICK_ACTION_TONE_CLASSES, quickActionsForRole } from "@/lib/nav/config";
+import { AccountBalanceValue } from "@/components/shared/account-balance-value";
+import { CombinedCashCard } from "@/components/shared/combined-cash-card";
 import { CASH_ACCOUNTS, CASH_ACCOUNT_LABELS } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -68,13 +70,15 @@ export default function DashboardPage() {
         }
       />
 
+      <CombinedCashCard />
+
       <StatRow>
         {CASH_ACCOUNTS.map((acc) => (
           <Stat
             key={acc}
             label={CASH_ACCOUNT_LABELS[acc]}
             isLoading={balanceLoading}
-            value={formatMoney(balance?.byAccount.find((b) => b.account === acc)?.uzs ?? "0", "UZS")}
+            value={<AccountBalanceValue balance={balance} account={acc} />}
           />
         ))}
         <Stat
