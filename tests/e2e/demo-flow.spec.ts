@@ -624,11 +624,6 @@ test.describe("quick-action routing regression", () => {
   });
 });
 
-const CASHIER = {
-  email: "cashier@euro-plaza.example",
-  password: process.env.SEED_CASHIER_PASSWORD ?? "ChangeMe123!DevOnly",
-};
-
 test.describe("two cash accounts", () => {
   // One session for the whole block: the API allows 50 logins a minute per
   // IP, and the full suite already sits close to that.
@@ -663,11 +658,13 @@ test.describe("two cash accounts", () => {
     await expect(bankStat).not.toHaveText(before, { timeout: 10000 });
   });
 
-  test("the form offers сум only — no currency or exchange-rate controls", async () => {
+  test("the form offers a currency choice, with rate controls only for USD", async () => {
     await page.goto("/finance/new?type=EXPENSE");
-    await expect(page.getByText("Сумма, сум")).toBeVisible();
-    await expect(page.getByRole("option", { name: "USD" })).toHaveCount(0);
-    await expect(page.getByText(/курс/i)).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "Валюта" })).toBeVisible();
+    await expect(page.getByText("Курс из списка")).toHaveCount(0);
+    await page.getByRole("combobox", { name: "Валюта" }).click();
+    await page.getByRole("option", { name: "USD" }).click();
+    await expect(page.getByText("Курс из списка")).toBeVisible();
   });
 
   test("spending more than one account holds is refused with a readable message", async () => {
@@ -676,66 +673,6 @@ test.describe("two cash accounts", () => {
     await page.getByRole("tab", { name: "Наличные" }).click();
     await page.locator("button[type=submit]").click();
     await expect(page.getByText("Недостаточно средств в выбранной кассе.")).toBeVisible({ timeout: 10000 });
-  });
-});
-
-test.describe("cashier (Касса only)", () => {
-  test.describe.configure({ mode: "serial" });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  });
-
-  test.afterAll(async () => {
-    await page.close();
-  });
-
-  test("lands in Касса and sees no other section", async () => {
-    await page.goto("/login");
-    await page.fill("#email", CASHIER.email);
-    await page.fill("#password", CASHIER.password);
-    await page.click("button[type=submit]");
-    // A cashier's home is Касса, not the dashboard they cannot open.
-    await page.waitForURL("**/finance", { timeout: 15000 });
-
-    // The bottom nav carries only Касса and Профиль — no "Ещё" sheet,
-    // nothing for suppliers, the warehouse or objects.
-    const nav = page.locator("nav").last();
-    await expect(nav.getByText("Касса")).toBeVisible();
-    await expect(nav.getByText("Профиль")).toBeVisible();
-    await expect(nav.getByText("Склады")).toHaveCount(0);
-    await expect(nav.getByText("Ещё")).toHaveCount(0);
-
-    // Quick actions are the three cash operations only.
-    await page.locator('button[aria-label="Новая операция"]').click();
-    const sheet = page.locator("[role=dialog], [data-slot=drawer-content]").last();
-    await expect(sheet.getByRole("button", { name: "Приход" })).toBeVisible();
-    await expect(sheet.getByRole("button", { name: "Закупка" })).toHaveCount(0);
-    await expect(sheet.getByRole("button", { name: "Списание" })).toHaveCount(0);
-    await page.keyboard.press("Escape");
-  });
-
-  test("an old link to another section sends them back to Касса", async () => {
-    for (const path of ["/suppliers", "/purchases/new", "/warehouses", "/settings/construction", "/dashboard"]) {
-      await page.goto(path);
-      await page.waitForURL("**/finance", { timeout: 15000 });
-    }
-  });
-
-  test("posts a salary from the cash account", async () => {
-    // Fund the cash account first so the salary has something to draw on.
-    await page.goto("/finance/new?type=INCOME");
-    await page.fill("#amount", "500000");
-    await page.locator("button[type=submit]").click();
-    await page.waitForURL(/\/finance\/[a-f0-9-]+$/, { timeout: 15000 });
-
-    await page.goto("/finance/new?type=SALARY");
-    await page.fill("#amount", "120000");
-    await page.fill("#party", "Рабочий бригады");
-    await page.locator("button[type=submit]").click();
-    await page.waitForURL(/\/finance\/[a-f0-9-]+$/, { timeout: 15000 });
-    await expect(page.getByText("Наличные")).toBeVisible();
   });
 });
 

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { homePathForRole } from "@/lib/auth/permissions";
+import { HOME_PATH } from "@/lib/auth/permissions";
 import { getErrorMessage } from "@/lib/errors/map";
 
 const schema = z.object({
@@ -36,7 +36,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       const user = await login(values.email, values.password);
-      router.replace(homePathForRole(user.role));
+      router.replace(HOME_PATH);
     } catch (error) {
       setServerError(getErrorMessage(error));
     }
