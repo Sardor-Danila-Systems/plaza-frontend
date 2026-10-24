@@ -11,6 +11,7 @@ import { ResponsiveDialog } from "@/components/shared/responsive-dialog";
 import {
   useCreateMaterial,
   useCreateMaterialCategory,
+  useCreateUnit,
   useMaterialCategories,
   useUnits,
 } from "@/lib/query/hooks/use-inventory";
@@ -37,11 +38,14 @@ export function CreateMaterialDialog({
   const [unitId, setUnitId] = useState("");
   const [minimumStock, setMinimumStock] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newUnitName, setNewUnitName] = useState("");
+  const [newUnitSymbol, setNewUnitSymbol] = useState("");
 
   const { data: categories = [] } = useMaterialCategories();
   const { data: units = [] } = useUnits();
   const createMaterial = useCreateMaterial();
   const createCategory = useCreateMaterialCategory();
+  const createUnit = useCreateUnit();
 
   const reset = () => {
     setName("");
@@ -51,6 +55,8 @@ export function CreateMaterialDialog({
     setUnitId("");
     setMinimumStock("");
     setNewCategoryName("");
+    setNewUnitName("");
+    setNewUnitSymbol("");
   };
 
   return (
@@ -169,6 +175,49 @@ export function CreateMaterialDialog({
               ))}
             </SelectContent>
           </Select>
+          <div className="flex gap-2">
+            <Input
+              className="h-9 flex-1"
+              placeholder="Название (Мешок)"
+              value={newUnitName}
+              onChange={(e) => setNewUnitName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+            />
+            <Input
+              className="h-9 w-24"
+              placeholder="Символ"
+              value={newUnitSymbol}
+              onChange={(e) => setNewUnitSymbol(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9"
+              disabled={!newUnitName.trim() || !newUnitSymbol.trim() || createUnit.isPending}
+              onClick={() => {
+                createUnit.mutate(
+                  { name: newUnitName.trim(), symbol: newUnitSymbol.trim() },
+                  {
+                    onSuccess: (unit) => {
+                      setUnitId(unit.id);
+                      setNewUnitName("");
+                      setNewUnitSymbol("");
+                      toast.success("Единица создана");
+                    },
+                    onError: (err) => toast.error(getErrorMessage(err)),
+                  },
+                );
+              }}
+            >
+              {createUnit.isPending ? "…" : "Создать"}
+            </Button>
+          </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="material-min-stock">Минимальный остаток (необязательно)</Label>
