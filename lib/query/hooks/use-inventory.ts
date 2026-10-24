@@ -5,7 +5,7 @@ import {
   type ListMaterialsFilters,
 } from "@/lib/api/inventory";
 import { qk } from "@/lib/query/keys";
-import type { Material, MaterialCategory, Warehouse } from "@/lib/api/types";
+import type { Material, MaterialCategory, Unit, Warehouse } from "@/lib/api/types";
 import { useProject } from "@/lib/project/project-context";
 
 export function useWarehouses() {
@@ -90,6 +90,21 @@ export function useUnits() {
     queryKey: qk.inventory.units(projectId!),
     queryFn: () => inventoryApi.listUnits(projectId!),
     enabled: !!projectId,
+  });
+}
+
+export function useCreateUnit() {
+  const { projectId } = useProject();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; symbol: string }) => inventoryApi.createUnit(projectId!, body),
+    onSuccess: (unit) => {
+      // Selectable the moment it is created — see useCreateWarehouse.
+      queryClient.setQueryData<Unit[]>(qk.inventory.units(projectId!), (current) =>
+        current ? [...current, unit] : [unit],
+      );
+      queryClient.invalidateQueries({ queryKey: ["inventory", projectId] });
+    },
   });
 }
 

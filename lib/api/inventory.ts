@@ -62,6 +62,9 @@ export const inventoryApi = {
 
   listUnits: (projectId: string) => apiFetch<Unit[]>(`/projects/${projectId}/units`),
 
+  createUnit: (projectId: string, body: { name: string; symbol: string }) =>
+    apiFetch<Unit>(`/projects/${projectId}/units`, { method: "POST", body }),
+
   listMaterials: (projectId: string, filters: ListMaterialsFilters) =>
     apiFetch<Material[]>(`/projects/${projectId}/materials`, {
       query: filters as Record<string, string | boolean | undefined>,
