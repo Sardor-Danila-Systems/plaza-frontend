@@ -14,7 +14,7 @@ import { useMaterials, useMaterialCategories } from "@/lib/query/hooks/use-inven
 import { CreateMaterialDialog } from "@/components/shared/create-material-dialog";
 import { useInventoryBalances } from "@/lib/query/hooks/use-inventory";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canMutateInventory } from "@/lib/auth/permissions";
 import { Badge } from "@/components/ui/badge";
 
 export default function MaterialsPage() {
@@ -23,7 +23,7 @@ export default function MaterialsPage() {
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canMutateInventory(user?.role);
 
   const { data: categories = [] } = useMaterialCategories();
   const { data: materials, isLoading, isError, error, refetch } = useMaterials({

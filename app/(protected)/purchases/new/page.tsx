@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useSuppliers, useSupplierAdvances } from "@/lib/query/hooks/use-suppliers";
 import { useWarehouses, useMaterials } from "@/lib/query/hooks/use-inventory";
 import { useCreatePurchase } from "@/lib/query/hooks/use-purchases";
+import { useAuth } from "@/lib/auth/auth-provider";
+import { canMutateInventory } from "@/lib/auth/permissions";
 import { CreateSupplierDialog } from "@/components/shared/create-supplier-dialog";
 import { CreateWarehouseDialog } from "@/components/shared/create-warehouse-dialog";
 import { CreateMaterialDialog } from "@/components/shared/create-material-dialog";
@@ -30,6 +32,10 @@ interface ItemRow extends PurchaseItemInput {
 
 export default function NewPurchasePage() {
   const router = useRouter();
+  const { user } = useAuth();
+  // Warehouses and materials belong to the storekeeper's area — a бухгалтер
+  // picks existing ones but cannot create them inline.
+  const canCreateInventory = canMutateInventory(user?.role);
   const [supplierId, setSupplierId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [currency, setCurrency] = useState<Currency>("UZS");
@@ -216,17 +222,19 @@ export default function NewPurchasePage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-11 shrink-0"
-                aria-label="Новый склад"
-                title="Новый склад"
-                onClick={() => setCreateWarehouseOpen(true)}
-              >
-                <Plus className="size-4" />
-              </Button>
+              {canCreateInventory && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="size-11 shrink-0"
+                  aria-label="Новый склад"
+                  title="Новый склад"
+                  onClick={() => setCreateWarehouseOpen(true)}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -242,10 +250,12 @@ export default function NewPurchasePage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Label id="purchase-materials-label">Материалы</Label>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setCreateMaterialOpen(true)}>
-                <Plus className="size-3.5" />
-                Новый материал
-              </Button>
+              {canCreateInventory && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setCreateMaterialOpen(true)}>
+                  <Plus className="size-3.5" />
+                  Новый материал
+                </Button>
+              )}
               <Button type="button" variant="outline" size="sm" onClick={addItem}>
                 <Plus className="size-3.5" />
                 Строка

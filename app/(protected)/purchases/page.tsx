@@ -12,12 +12,12 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PurchaseStatusBadge } from "@/components/shared/status-badge";
 import { usePurchases } from "@/lib/query/hooks/use-purchases";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canMutateFinance } from "@/lib/auth/permissions";
 import { formatBusinessDate } from "@/lib/format/date";
 
 export default function PurchasesPage() {
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canMutateFinance(user?.role);
   const { data, isLoading, isError, error, refetch } = usePurchases({ pageSize: 50 });
 
   return (

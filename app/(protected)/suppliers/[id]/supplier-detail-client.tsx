@@ -30,7 +30,7 @@ import { getErrorMessage } from "@/lib/errors/map";
 import { formatBusinessDate, todayBusinessDate } from "@/lib/format/date";
 import { formatMoney, isPositiveDecimalString } from "@/lib/format/decimal";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canMutateFinance } from "@/lib/auth/permissions";
 import type { CashAccount, Currency, Supplier } from "@/lib/api/types";
 import { CurrencySelect, RateFields, useRateForm } from "@/components/shared/currency-rate-fields";
 import { CashAccountPicker } from "@/components/shared/cash-account-picker";
@@ -38,7 +38,7 @@ import { CashAccountPicker } from "@/components/shared/cash-account-picker";
 export function SupplierDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canMutateFinance(user?.role);
   const { data: supplier, isLoading, isError, error, refetch } = useSupplier(id);
   const { data: ledger, isLoading: ledgerLoading } = useSupplierLedger(id);
   const [advanceOpen, setAdvanceOpen] = useState(false);

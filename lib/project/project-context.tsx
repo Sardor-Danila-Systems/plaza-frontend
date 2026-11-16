@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectsApi } from "@/lib/api/projects";
 import { qk, PROJECT_SCOPED_NAMESPACES } from "@/lib/query/keys";
 import { useAuth } from "@/lib/auth/auth-provider";
+import { isProjectScoped } from "@/lib/auth/permissions";
 import type { Project } from "@/lib/api/types";
 
 const STORAGE_KEY = "plaza:selectedProjectId";
@@ -39,8 +40,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     if (explicitProjectId && projects.some((p) => p.id === explicitProjectId)) {
       return explicitProjectId;
     }
-    // The manager is pinned to their one project.
-    if (user.role === "PROJECT_MANAGER" && user.projectId) {
+    // Project-scoped roles are pinned to their one project.
+    if (isProjectScoped(user.role) && user.projectId) {
       return user.projectId;
     }
     const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
@@ -74,7 +75,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       project,
       projects,
       isLoading,
-      canSwitch: user?.role !== "PROJECT_MANAGER",
+      canSwitch: !isProjectScoped(user?.role),
       setProjectId,
     }),
     [projectId, project, projects, isLoading, user, setProjectId],

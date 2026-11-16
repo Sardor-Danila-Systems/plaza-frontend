@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth/auth-provider";
-import { HOME_PATH, isPathAllowed } from "@/lib/auth/permissions";
+import { homePathForRole, isPathAllowed } from "@/lib/auth/permissions";
 import { ProjectProvider, useProject } from "@/lib/project/project-context";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -13,7 +13,7 @@ function Gate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, status, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  // A section the role may not open (a cashier following an old link to
+  // A section the role may not open (a storekeeper following an old link to
   // /suppliers, say) would only render a wall of 403 errors — send them
   // home instead. The backend still enforces this regardless.
   const allowed = isPathAllowed(user?.role, pathname);
@@ -23,7 +23,7 @@ function Gate({ children }: { children: React.ReactNode }) {
   }, [status, router]);
 
   useEffect(() => {
-    if (isAuthenticated && !allowed) router.replace(HOME_PATH);
+    if (isAuthenticated && !allowed) router.replace(homePathForRole(user?.role));
   }, [isAuthenticated, allowed, user?.role, router]);
 
   if (!isAuthenticated || !allowed) {

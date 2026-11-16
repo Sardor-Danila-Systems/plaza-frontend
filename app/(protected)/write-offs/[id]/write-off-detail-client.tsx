@@ -16,12 +16,12 @@ import { formatBusinessDate, formatDateTime } from "@/lib/format/date";
 import { formatQuantity } from "@/lib/format/decimal";
 import { getErrorMessage } from "@/lib/errors/map";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canMutateInventory } from "@/lib/auth/permissions";
 
 export function WriteOffDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canMutateInventory(user?.role);
   const { data, isLoading, isError, error, refetch } = useWriteOff(id);
   const cancelMutation = useCancelWriteOff();
   const { key, renew } = useIdempotencyKey();

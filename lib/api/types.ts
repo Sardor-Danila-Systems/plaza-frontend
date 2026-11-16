@@ -4,7 +4,7 @@
 // into JS `number` for accounting arithmetic. See lib/format/decimal.ts.
 
 /** DEVELOPER is the support account: full read and write on every project. */
-export type Role = "OWNER" | "ACCOUNTANT" | "PROJECT_MANAGER" | "DEVELOPER";
+export type Role = "OWNER" | "ACCOUNTANT" | "PROJECT_MANAGER" | "DEVELOPER" | "FINANCE" | "WAREHOUSE";
 
 /** The project's two cash accounts. Every balance and every
  * "insufficient cash" check is per account. */

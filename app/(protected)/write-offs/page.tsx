@@ -11,13 +11,13 @@ import { MoneyText } from "@/components/shared/money-text";
 import { PageHeader } from "@/components/shared/page-header";
 import { useWriteOffs } from "@/lib/query/hooks/use-write-offs";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canMutateInventory } from "@/lib/auth/permissions";
 import { formatBusinessDate } from "@/lib/format/date";
 import { formatQuantity } from "@/lib/format/decimal";
 
 export default function WriteOffsPage() {
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canMutateInventory(user?.role);
   const { data, isLoading, isError, error, refetch } = useWriteOffs({ pageSize: 50 });
 
   return (
