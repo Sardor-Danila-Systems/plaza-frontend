@@ -40,6 +40,21 @@ export function useCreateBlocksBulk() {
   });
 }
 
+export function useUpdateBlock() {
+  const { projectId } = useProject();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      blockId,
+      body,
+    }: {
+      blockId: string;
+      body: { name?: string; isActive?: boolean; stage?: string | null; sortOrder?: number };
+    }) => constructionApi.updateBlock(projectId!, blockId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["construction", projectId] }),
+  });
+}
+
 export function useCreateFloorsBulk() {
   const { projectId } = useProject();
   const queryClient = useQueryClient();

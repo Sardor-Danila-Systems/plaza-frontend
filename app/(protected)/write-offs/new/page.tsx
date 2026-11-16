@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWarehouses, useInventoryBalances } from "@/lib/query/hooks/use-inventory";
 import { useBlocks, useFloors } from "@/lib/query/hooks/use-construction";
+import { blockLabel } from "@/lib/format/block";
 import { useCreateWriteOff } from "@/lib/query/hooks/use-write-offs";
 import { useIdempotencyKey } from "@/lib/idempotency";
 import { getErrorMessage } from "@/lib/errors/map";
@@ -172,7 +173,7 @@ export default function NewWriteOffPage() {
               <SelectContent>
                 {blocks.map((b) => (
                   <SelectItem key={b.id} value={b.id}>
-                    {b.name}
+                    {blockLabel(b)}
                   </SelectItem>
                 ))}
               </SelectContent>
