@@ -102,6 +102,10 @@ export interface BuildingBlock {
   projectId: string;
   name: string;
   code: string;
+  /** Construction stage (очередь), e.g. "A"; null = none. */
+  stage: string | null;
+  /** Build order — the API already lists blocks by it. */
+  sortOrder: number;
   isActive: boolean;
   createdAt: string;
 }

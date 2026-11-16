@@ -25,7 +25,7 @@ export const constructionApi = {
   updateBlock: (
     projectId: string,
     blockId: string,
-    body: { name?: string; isActive?: boolean },
+    body: { name?: string; isActive?: boolean; stage?: string | null; sortOrder?: number },
   ) =>
     apiFetch<BuildingBlock>(`/projects/${projectId}/construction/blocks/${blockId}`, {
       method: "PATCH",

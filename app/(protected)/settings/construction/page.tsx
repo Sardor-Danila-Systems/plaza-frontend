@@ -18,7 +18,10 @@ import {
   useFloors,
   useCreateBlocksBulk,
   useCreateFloorsBulk,
+  useUpdateBlock,
 } from "@/lib/query/hooks/use-construction";
+import { groupBlocksByStage } from "@/lib/format/block";
+import type { BuildingBlock } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { canMutateProject } from "@/lib/auth/permissions";
 import { getErrorMessage } from "@/lib/errors/map";
@@ -76,33 +79,45 @@ export default function ConstructionSettingsPage() {
       )}
 
       {!isLoading && !isError && blocks && blocks.length > 0 && (
-        <div className="space-y-3">
-          {blocks.map((block) => {
-            const expanded = expandedBlockId === block.id;
-            return (
-              <div key={block.id} className="rounded-lg border">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
-                  aria-expanded={expanded}
-                  onClick={() => setExpandedBlockId((cur) => (cur === block.id ? null : block.id))}
-                >
-                  <span className="min-w-0">
-                    <span className="text-sm font-medium">{block.name}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">{block.code}</span>
-                    {!block.isActive && (
-                      <span className="ml-2 text-xs text-muted-foreground">(архив)</span>
-                    )}
+        <div className="space-y-6">
+          {groupBlocksByStage(blocks).map((group) => (
+            <section key={group.stage ?? "none"} className="space-y-3">
+              {/* Stages are the build order (очередь A, B, …); a project
+                  that never set one sees a single untitled list. */}
+              {(group.stage !== null || blocks.some((b) => b.stage !== null)) && (
+                <h2 className="text-sm font-semibold">
+                  {group.stage ? `Очередь ${group.stage}` : "Без очереди"}
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {plural(group.blocks.length, "блок", "блока", "блоков")}
                   </span>
-                  <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                    Этажи
-                    {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                  </span>
-                </button>
-                {expanded && <FloorsSection blockId={block.id} canMutate={canMutate} />}
-              </div>
-            );
-          })}
+                </h2>
+              )}
+              {group.blocks.map((block) => {
+                const expanded = expandedBlockId === block.id;
+                return (
+                  <div key={block.id} className="rounded-lg border">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+                      aria-expanded={expanded}
+                      onClick={() => setExpandedBlockId((cur) => (cur === block.id ? null : block.id))}
+                    >
+                      <span className="min-w-0">
+                        <span className="text-sm font-medium">{block.name}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{block.code}</span>
+                        {!block.isActive && <span className="ml-2 text-xs text-muted-foreground">(архив)</span>}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                        Этажи
+                        {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                      </span>
+                    </button>
+                    {expanded && <FloorsSection block={block} canMutate={canMutate} />}
+                  </div>
+                );
+              })}
+            </section>
+          ))}
         </div>
       )}
 
@@ -111,12 +126,14 @@ export default function ConstructionSettingsPage() {
   );
 }
 
-function FloorsSection({ blockId, canMutate }: { blockId: string; canMutate: boolean }) {
+function FloorsSection({ block, canMutate }: { block: BuildingBlock; canMutate: boolean }) {
+  const blockId = block.id;
   const { data: floors, isLoading } = useFloors(blockId);
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
     <div className="border-t px-4 py-3">
+      {canMutate && <StageEditor block={block} />}
       {isLoading ? (
         <Skeleton className="h-16 w-full rounded-md" />
       ) : floors && floors.length > 0 ? (
@@ -331,6 +348,68 @@ function CreateBlocksDialog({
     </ResponsiveDialog>
   );
 }
+
+/** Moves a block between stages (очередь) and sets its place in the build
+ * order. An empty stage takes the block out of every stage. */
+function StageEditor({ block }: { block: BuildingBlock }) {
+  const [stage, setStage] = useState(block.stage ?? "");
+  const [order, setOrder] = useState(String(block.sortOrder));
+  const updateBlock = useUpdateBlock();
+  const nextStage = stage.trim() || null;
+  const nextOrder = clampInt(order, 0, 100000);
+  const changed = nextStage !== block.stage || nextOrder !== block.sortOrder;
+
+  return (
+    <form
+      className="mb-3 flex flex-wrap items-end gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        updateBlock.mutate(
+          {
+            blockId: block.id,
+            body: { stage: nextStage, sortOrder: nextOrder },
+          },
+          {
+            onSuccess: () => toast.success("Блок обновлён"),
+            onError: (err) => toast.error(getErrorMessage(err)),
+          },
+        );
+      }}
+    >
+      <div className="space-y-1">
+        <Label htmlFor={`stage-${block.id}`} className="text-xs">
+          Очередь
+        </Label>
+        <Input
+          id={`stage-${block.id}`}
+          className="h-9 w-24"
+          value={stage}
+          maxLength={50}
+          placeholder="A"
+          onChange={(e) => setStage(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor={`order-${block.id}`} className="text-xs">
+          Порядок
+        </Label>
+        <Input
+          id={`order-${block.id}`}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          className="h-9 w-20"
+          value={order}
+          onChange={(e) => setOrder(e.target.value)}
+        />
+      </div>
+      <Button type="submit" size="sm" variant="outline" className="h-9" disabled={!changed || updateBlock.isPending}>
+        {updateBlock.isPending ? "…" : "Сохранить"}
+      </Button>
+    </form>
+  );
+}
+
 
 function AddFloorsDialog({
   blockId,
