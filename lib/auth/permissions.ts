@@ -21,40 +21,41 @@ export function isProjectScoped(role: Role | undefined): boolean {
   return role === "PROJECT_MANAGER" || role === "FINANCE" || role === "WAREHOUSE";
 }
 
-/** Construction objects and anything not covered by the two below. */
+/** Construction objects (blocks, floors). */
 export function canMutateProject(role: Role | undefined): boolean {
-  return role === "PROJECT_MANAGER" || role === "DEVELOPER" || role === "OWNER";
+  return role === "WAREHOUSE" || role === "DEVELOPER";
 }
 
 /** Suppliers, their payments and advances, purchases. */
 export function canMutateFinance(role: Role | undefined): boolean {
-  return canMutateProject(role) || role === "FINANCE";
+  return role === "WAREHOUSE" || role === "DEVELOPER";
 }
 
-/** Posting, cancelling and commenting on cash operations (Касса). */
+/** Posting, cancelling and commenting on cash operations (Касса) —
+ * the owner's and the manager's job. */
 export function canPostCash(role: Role | undefined): boolean {
-  return canMutateFinance(role);
+  return role === "OWNER" || role === "PROJECT_MANAGER" || role === "DEVELOPER";
 }
 
 /** Warehouses, materials, write-offs, transfers. */
 export function canMutateInventory(role: Role | undefined): boolean {
-  return canMutateProject(role) || role === "WAREHOUSE";
+  return role === "WAREHOUSE" || role === "DEVELOPER";
 }
 
 /** Where a user lands after login, and where they are sent back to from a
- * section they may not open. The storekeeper has no dashboard — it is made
- * of cash and supplier figures they may not see. */
+ * section they may not open. The бухгалтер works from reports. */
 export function homePathForRole(role: Role | undefined): string {
-  return role === "WAREHOUSE" ? "/warehouses" : "/dashboard";
+  return role === "FINANCE" ? "/reports" : "/dashboard";
 }
 
 /** Sections a role is narrowed to; a role absent here may open them all.
- * For the owner this is a deliberate UI narrowing (the backend lets it read
- * everything); for the storekeeper it mirrors the backend, which denies
- * every cash and supplier endpoint. */
+ * The owner and the manager run only the cash book — a deliberate UI
+ * narrowing (the backend still lets them read everything); the warehouse
+ * belongs to the кладовщик. */
+const CASH_ONLY_PATHS = ["/dashboard", "/finance", "/profile"];
 const ROLE_PATHS: Partial<Record<Role, string[]>> = {
-  OWNER: ["/dashboard", "/finance", "/suppliers", "/purchases", "/history", "/settings/construction", "/profile"],
-  WAREHOUSE: ["/warehouses", "/materials", "/write-offs", "/settings/construction", "/profile"],
+  OWNER: CASH_ONLY_PATHS,
+  PROJECT_MANAGER: CASH_ONLY_PATHS,
 };
 
 export function isPathAllowed(role: Role | undefined, pathname: string): boolean {

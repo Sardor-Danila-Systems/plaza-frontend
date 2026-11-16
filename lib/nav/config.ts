@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/api/types";
-import { canMutateFinance, canMutateInventory, isPathAllowed } from "@/lib/auth/permissions";
+import { canMutateFinance, canMutateInventory, canPostCash, isPathAllowed } from "@/lib/auth/permissions";
 import {
   LayoutDashboard,
   Wallet,
@@ -72,26 +72,31 @@ export const NAV_GROUP_ORDER: NavGroup[] = [
   "OBJECTS",
 ];
 
-/** The sections a role may open — a storekeeper's is just the warehouse
- * sections and their own profile. Every nav surface (sidebar, bottom nav, "Ещё", ⌘K) filters
+/** The sections a role may open — the owner's and the manager's are just
+ * the dashboard, Касса and their own profile. Every nav surface (sidebar, bottom nav, "Ещё", ⌘K) filters
  * through this, so no surface can offer a section the role is denied. */
 export function sectionsForRole(role: Role | undefined): NavItem[] {
   return SECTIONS.filter((s) => isPathAllowed(role, s.href));
 }
 
-/** The mobile bottom nav — a subset of SECTIONS plus the quick-action "+".
- * The owner has no warehouse section, so Закупки takes its slot; the
- * storekeeper has only warehouse sections. */
+/** The mobile bottom nav — up to three of the role's sections around the
+ * quick-action "+", in this order of preference. */
+const BOTTOM_NAV_PREFERENCE: Partial<Record<Role, string[]>> = {
+  FINANCE: ["/reports", "/dashboard", "/analytics"],
+  WAREHOUSE: ["/dashboard", "/warehouses", "/purchases"],
+};
+const DEFAULT_BOTTOM_NAV = ["/dashboard", "/finance", "/warehouses"];
+
 export function bottomNavForRole(role: Role | undefined): {
   left: NavItem[];
   right: NavItem[];
   showMore: boolean;
 } {
-  if (role === "WAREHOUSE") {
-    return { left: [SECTIONS[3], SECTIONS[4]], right: [SECTIONS[6]], showMore: true };
-  }
-  const right = isPathAllowed(role, "/warehouses") ? SECTIONS[3] : SECTIONS[5];
-  return { left: [SECTIONS[0], SECTIONS[1]], right: [right], showMore: true };
+  const preferred = (role && BOTTOM_NAV_PREFERENCE[role]) || DEFAULT_BOTTOM_NAV;
+  const items = preferred
+    .filter((href) => isPathAllowed(role, href))
+    .map((href) => SECTIONS.find((s) => s.href === href)!);
+  return { left: items.slice(0, 2), right: items.slice(2, 3), showMore: true };
 }
 
 export const MORE_ICON = MoreHorizontal;
@@ -139,11 +144,13 @@ export const QUICK_ACTION_TONE_CLASSES: Record<QuickActionTone, { bg: string; ic
 
 export function quickActionsForRole(role: Role | undefined): QuickAction[] {
   // Only the actions of sections the role may open AND write to: the owner
-  // is offered some sections, the бухгалтер writes only money, the
-  // кладовщик only the warehouse.
+  // and the manager post cash, the кладовщик everything else, the
+  // бухгалтер nothing.
   return QUICK_ACTIONS.filter((a) => {
     const path = a.href.split("?")[0];
     if (!isPathAllowed(role, path)) return false;
-    return path.startsWith("/write-offs") ? canMutateInventory(role) : canMutateFinance(role);
+    if (path.startsWith("/finance")) return canPostCash(role);
+    if (path.startsWith("/write-offs")) return canMutateInventory(role);
+    return canMutateFinance(role);
   });
 }
