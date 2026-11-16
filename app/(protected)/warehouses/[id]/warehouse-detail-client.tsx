@@ -17,12 +17,12 @@ import { useWarehouse, useUpdateWarehouse, useInventoryBalances } from "@/lib/qu
 import { formatQuantity } from "@/lib/format/decimal";
 import { getErrorMessage } from "@/lib/errors/map";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canMutateInventory } from "@/lib/auth/permissions";
 
 export function WarehouseDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canMutateInventory(user?.role);
   const { data: warehouse, isLoading, isError, error, refetch } = useWarehouse(id);
   const { data: balances = [], isLoading: balancesLoading } = useInventoryBalances({ warehouseId: id });
   const updateMutation = useUpdateWarehouse();

@@ -23,7 +23,7 @@ import { formatMoney, formatQuantity } from "@/lib/format/decimal";
 import { formatBusinessDate } from "@/lib/format/date";
 import { useProject } from "@/lib/project/project-context";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canPostCash } from "@/lib/auth/permissions";
 import { QUICK_ACTION_TONE_CLASSES, quickActionsForRole } from "@/lib/nav/config";
 import { AccountBalanceValue } from "@/components/shared/account-balance-value";
 import { CombinedCashCard } from "@/components/shared/combined-cash-card";
@@ -43,7 +43,7 @@ const TYPE_LABELS: Record<string, string> = {
 export default function DashboardPage() {
   const { project } = useProject();
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canPostCash(user?.role);
 
   const { data: balance, isLoading: balanceLoading } = useFinanceBalance();
   const { data: lowStock, isLoading: lowStockLoading } = useInventoryBalances({ lowStock: true });

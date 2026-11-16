@@ -14,7 +14,7 @@ import { useSuppliers } from "@/lib/query/hooks/use-suppliers";
 import { CreateSupplierDialog } from "@/components/shared/create-supplier-dialog";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canMutateFinance } from "@/lib/auth/permissions";
 
 export default function SuppliersPage() {
   const [search, setSearch] = useState("");
@@ -25,7 +25,7 @@ export default function SuppliersPage() {
     search: debouncedSearch || undefined,
   });
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canMutateFinance(user?.role);
   const [createOpen, setCreateOpen] = useState(false);
 
   const isSearching = debouncedSearch.length > 0;

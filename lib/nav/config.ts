@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/api/types";
-import { canMutateProject, isPathAllowed } from "@/lib/auth/permissions";
+import { canMutateFinance, canMutateInventory, isPathAllowed } from "@/lib/auth/permissions";
 import {
   LayoutDashboard,
   Wallet,
@@ -72,20 +72,24 @@ export const NAV_GROUP_ORDER: NavGroup[] = [
   "OBJECTS",
 ];
 
-/** The sections a role may open — a cashier's is just Касса and their own
- * profile. Every nav surface (sidebar, bottom nav, "Ещё", ⌘K) filters
+/** The sections a role may open — a storekeeper's is just the warehouse
+ * sections and their own profile. Every nav surface (sidebar, bottom nav, "Ещё", ⌘K) filters
  * through this, so no surface can offer a section the role is denied. */
 export function sectionsForRole(role: Role | undefined): NavItem[] {
   return SECTIONS.filter((s) => isPathAllowed(role, s.href));
 }
 
 /** The mobile bottom nav — a subset of SECTIONS plus the quick-action "+".
- * The owner has no warehouse section, so Закупки takes its slot. */
+ * The owner has no warehouse section, so Закупки takes its slot; the
+ * storekeeper has only warehouse sections. */
 export function bottomNavForRole(role: Role | undefined): {
   left: NavItem[];
   right: NavItem[];
   showMore: boolean;
 } {
+  if (role === "WAREHOUSE") {
+    return { left: [SECTIONS[3], SECTIONS[4]], right: [SECTIONS[6]], showMore: true };
+  }
   const right = isPathAllowed(role, "/warehouses") ? SECTIONS[3] : SECTIONS[5];
   return { left: [SECTIONS[0], SECTIONS[1]], right: [right], showMore: true };
 }
@@ -106,8 +110,8 @@ export interface QuickAction {
 }
 
 /** Central "+" quick actions — all are mutations. Use
- * `quickActionsForRole`, never this list directly: the owner gets only the
- * actions of its sections, read-only roles get none. */
+ * `quickActionsForRole`, never this list directly: each role gets only the
+ * actions it may perform, read-only roles get none. */
 export const QUICK_ACTIONS: QuickAction[] = [
   { href: "/finance/new?type=INCOME", label: "Приход", icon: ArrowDownCircle, tone: "success" },
   { href: "/finance/new?type=EXPENSE", label: "Расход", icon: ArrowUpCircle, tone: "destructive" },
@@ -134,7 +138,12 @@ export const QUICK_ACTION_TONE_CLASSES: Record<QuickActionTone, { bg: string; ic
 };
 
 export function quickActionsForRole(role: Role | undefined): QuickAction[] {
-  if (!canMutateProject(role)) return [];
-  // The owner is offered only some sections, so only their actions.
-  return QUICK_ACTIONS.filter((a) => isPathAllowed(role, a.href.split("?")[0]));
+  // Only the actions of sections the role may open AND write to: the owner
+  // is offered some sections, the бухгалтер writes only money, the
+  // кладовщик only the warehouse.
+  return QUICK_ACTIONS.filter((a) => {
+    const path = a.href.split("?")[0];
+    if (!isPathAllowed(role, path)) return false;
+    return path.startsWith("/write-offs") ? canMutateInventory(role) : canMutateFinance(role);
+  });
 }

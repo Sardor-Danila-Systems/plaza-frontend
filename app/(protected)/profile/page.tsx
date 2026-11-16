@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PasswordInput } from "@/components/shared/password-input";
 import { PageHeader } from "@/components/shared/page-header";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { ROLE_LABELS } from "@/lib/auth/permissions";
+import { isProjectScoped, ROLE_LABELS } from "@/lib/auth/permissions";
 import { useProject } from "@/lib/project/project-context";
 import { getErrorMessage } from "@/lib/errors/map";
 
@@ -40,7 +40,7 @@ export default function ProfilePage() {
                 <Badge variant="secondary">{user ? ROLE_LABELS[user.role] : ""}</Badge>
               </dd>
             </div>
-            {user?.role === "PROJECT_MANAGER" && (
+            {isProjectScoped(user?.role) && (
               <div className="flex items-center justify-between">
                 <dt className="text-muted-foreground">Проект</dt>
                 <dd>{project?.name ?? "—"}</dd>

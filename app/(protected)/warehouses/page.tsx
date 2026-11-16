@@ -12,12 +12,12 @@ import { ErrorState } from "@/components/shared/error-state";
 import { useWarehouses } from "@/lib/query/hooks/use-inventory";
 import { CreateWarehouseDialog } from "@/components/shared/create-warehouse-dialog";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { canMutateProject } from "@/lib/auth/permissions";
+import { canMutateInventory } from "@/lib/auth/permissions";
 
 export default function WarehousesPage() {
   const { data, isLoading, isError, error, refetch } = useWarehouses();
   const { user } = useAuth();
-  const canMutate = canMutateProject(user?.role);
+  const canMutate = canMutateInventory(user?.role);
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
