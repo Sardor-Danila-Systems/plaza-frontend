@@ -72,9 +72,9 @@ export const NAV_GROUP_ORDER: NavGroup[] = [
   "OBJECTS",
 ];
 
-/** The sections a role may open — the owner's and the manager's are just
- * the dashboard, Касса and their own profile. Every nav surface (sidebar, bottom nav, "Ещё", ⌘K) filters
- * through this, so no surface can offer a section the role is denied. */
+/** The sections a role may open — see `isPathAllowed` for who sees what.
+ * Every nav surface (sidebar, bottom nav, "Ещё", ⌘K) filters through this,
+ * so no surface can offer a section the role is denied. */
 export function sectionsForRole(role: Role | undefined): NavItem[] {
   return SECTIONS.filter((s) => isPathAllowed(role, s.href));
 }
@@ -83,7 +83,9 @@ export function sectionsForRole(role: Role | undefined): NavItem[] {
  * quick-action "+", in this order of preference. */
 const BOTTOM_NAV_PREFERENCE: Partial<Record<Role, string[]>> = {
   FINANCE: ["/reports", "/dashboard", "/analytics"],
-  WAREHOUSE: ["/dashboard", "/warehouses", "/purchases"],
+  OWNER: ["/dashboard", "/finance", "/reports"],
+  PROJECT_MANAGER: ["/dashboard", "/finance", "/reports"],
+  WAREHOUSE: ["/warehouses", "/purchases", "/write-offs"],
 };
 const DEFAULT_BOTTOM_NAV = ["/dashboard", "/finance", "/warehouses"];
 
