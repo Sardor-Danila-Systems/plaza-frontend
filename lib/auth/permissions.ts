@@ -43,19 +43,44 @@ export function canMutateInventory(role: Role | undefined): boolean {
 }
 
 /** Where a user lands after login, and where they are sent back to from a
- * section they may not open. The бухгалтер works from reports. */
+ * section they may not open. The бухгалтер works from reports, the
+ * кладовщик from the warehouse (the dashboard is cash figures). */
 export function homePathForRole(role: Role | undefined): string {
-  return role === "FINANCE" ? "/reports" : "/dashboard";
+  if (role === "FINANCE") return "/reports";
+  if (role === "WAREHOUSE") return "/warehouses";
+  return "/dashboard";
 }
 
 /** Sections a role is narrowed to; a role absent here may open them all.
- * The owner and the manager run only the cash book — a deliberate UI
- * narrowing (the backend still lets them read everything); the warehouse
- * belongs to the кладовщик. */
-const CASH_ONLY_PATHS = ["/dashboard", "/finance", "/profile"];
+ * A deliberate UI split (the backend still lets each of them read the whole
+ * project): the owner and the manager see the money side and post cash, the
+ * кладовщик sees the warehouse side — no Касса, dashboard, analytics or
+ * reports. */
+const MONEY_SIDE_PATHS = [
+  "/dashboard",
+  "/analytics",
+  "/finance",
+  "/suppliers",
+  "/purchases",
+  "/history",
+  "/audit",
+  "/reports",
+  "/settings/construction",
+  "/profile",
+];
+const WAREHOUSE_SIDE_PATHS = [
+  "/warehouses",
+  "/materials",
+  "/write-offs",
+  "/suppliers",
+  "/purchases",
+  "/settings/construction",
+  "/profile",
+];
 const ROLE_PATHS: Partial<Record<Role, string[]>> = {
-  OWNER: CASH_ONLY_PATHS,
-  PROJECT_MANAGER: CASH_ONLY_PATHS,
+  OWNER: MONEY_SIDE_PATHS,
+  PROJECT_MANAGER: MONEY_SIDE_PATHS,
+  WAREHOUSE: WAREHOUSE_SIDE_PATHS,
 };
 
 export function isPathAllowed(role: Role | undefined, pathname: string): boolean {
