@@ -63,7 +63,7 @@ function FinanceHistory() {
           <DataListRow onClick={() => {}}>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {TYPE_LABELS[tx.type] ?? tx.type}
+                {tx.isAdvance ? "Аванс по зарплате" : (TYPE_LABELS[tx.type] ?? tx.type)}
                 {tx.cancelledAt ? " (отменено)" : ""}
               </p>
               <p className="text-xs text-muted-foreground">{formatBusinessDate(tx.occurredAt)}</p>

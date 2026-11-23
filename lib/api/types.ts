@@ -179,6 +179,7 @@ export interface FinancialTransaction {
   categoryId: string | null;
   categoryNameSnapshot: string | null;
   recipient: string | null;
+  isAdvance: boolean;
   comment: string | null;
   occurredAt: string;
   createdById: string;

@@ -57,7 +57,7 @@ export function FinanceDetailClient({ id }: { id: string }) {
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="size-4" />
         </Button>
-        <h1 className="text-lg font-semibold">{TYPE_LABELS[data.type] ?? data.type}</h1>
+        <h1 className="text-lg font-semibold">{data.isAdvance ? "Аванс по зарплате" : (TYPE_LABELS[data.type] ?? data.type)}</h1>
       </div>
 
       <Card>
@@ -93,7 +93,7 @@ export function FinanceDetailClient({ id }: { id: string }) {
             {data.recipient && (
               <>
                 <dt className="text-muted-foreground">
-                  {data.type === "INCOME" ? "Источник" : "Получатель"}
+                  {data.type === "INCOME" ? "Источник" : data.type === "SALARY" ? "Сотрудник" : "Получатель"}
                 </dt>
                 <dd className="text-right">{data.recipient}</dd>
               </>

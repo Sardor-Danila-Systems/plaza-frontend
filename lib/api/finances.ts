@@ -23,6 +23,8 @@ export interface CreateFinancialTransactionInput {
   categoryId?: string;
   source?: string;
   recipient?: string;
+  /** SALARY only: the payment is an advance (аванс). */
+  isAdvance?: boolean;
   comment?: string;
   occurredAt: string;
 }

@@ -89,6 +89,7 @@ function FinanceForm({
   const [account, setAccount] = useState<CashAccount>("CASH");
   const [categoryId, setCategoryId] = useState("");
   const [party, setParty] = useState("");
+  const [isAdvance, setIsAdvance] = useState(false);
   const [comment, setComment] = useState("");
   const [occurredAt, setOccurredAt] = useState(todayBusinessDate());
   const [formError, setFormError] = useState<string | null>(null);
@@ -125,6 +126,7 @@ function FinanceForm({
           categoryId: categoryId || undefined,
           source: type === "INCOME" ? party || undefined : undefined,
           recipient: type !== "INCOME" ? party || undefined : undefined,
+          isAdvance: type === "SALARY" && isAdvance ? true : undefined,
           comment: comment.trim() || undefined,
           occurredAt,
         },
@@ -144,6 +146,35 @@ function FinanceForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       {formError && <p className="text-sm text-destructive">{formError}</p>}
+
+      {type === "SALARY" && (
+        <div className="space-y-2">
+          <Label id="salary-kind-label">Вид выплаты</Label>
+          <div
+            role="radiogroup"
+            aria-labelledby="salary-kind-label"
+            className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+          >
+            {[
+              { value: false, label: "Зарплата" },
+              { value: true, label: "Аванс" },
+            ].map((o) => (
+              <button
+                key={o.label}
+                type="button"
+                role="radio"
+                aria-checked={isAdvance === o.value}
+                onClick={() => setIsAdvance(o.value)}
+                className={`h-10 rounded-md text-sm font-medium transition-colors ${
+                  isAdvance === o.value ? "bg-background shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="amount">Сумма</Label>
@@ -187,7 +218,7 @@ function FinanceForm({
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="party">{type === "INCOME" ? "Источник" : "Получатель"}</Label>
+        <Label htmlFor="party">{type === "INCOME" ? "Источник" : type === "SALARY" ? "Сотрудник" : "Получатель"}</Label>
         <Input
           id="party"
           className="h-11"
