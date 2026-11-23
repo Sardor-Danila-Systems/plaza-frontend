@@ -65,6 +65,9 @@ export default function FinancePage() {
         title="Касса"
         actions={
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/finance/employees">Сотрудники</Link>
+            </Button>
             <CashJournalButton account={account === "ALL" ? undefined : (account as CashAccount)} />
             {canMutate && (
             <DropdownMenu>
@@ -86,6 +89,10 @@ export default function FinancePage() {
                 <DropdownMenuItem onSelect={() => router.push("/finance/new?type=SALARY")}>
                   <Banknote className="size-4" />
                   Зарплата
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push("/finance/new?type=SALARY&advance=1")}>
+                  <Banknote className="size-4" />
+                  Аванс по зарплате
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

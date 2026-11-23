@@ -180,6 +180,9 @@ export interface FinancialTransaction {
   categoryNameSnapshot: string | null;
   recipient: string | null;
   isAdvance: boolean;
+  employeeId: string | null;
+  /** Salary payout: accrued; `amount` is the cash actually paid. */
+  accruedAmount: string | null;
   comment: string | null;
   occurredAt: string;
   createdById: string;
@@ -476,3 +479,45 @@ export interface ConstructionAnalyticsRow {
   valueUzs: string;
 }
 
+
+export interface AdvanceBalance {
+  currency: Currency;
+  advanced: string;
+  deducted: string;
+  outstanding: string;
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  isActive: boolean;
+  balances: AdvanceBalance[];
+}
+
+export interface OpenAdvance {
+  id: string;
+  occurredAt: string;
+  currency: Currency;
+  amount: string;
+  deducted: string;
+  remaining: string;
+}
+
+export interface EmployeeLedgerEntry {
+  id: string;
+  kind: "ADVANCE" | "PAYOUT";
+  occurredAt: string;
+  currency: Currency;
+  amount: string;
+  accruedAmount: string | null;
+  deductions: { advanceId: string; amount: string }[];
+  account: CashAccount;
+  comment: string | null;
+  cancelled: boolean;
+}
+
+export interface EmployeeLedger {
+  employee: Employee;
+  openAdvances: OpenAdvance[];
+  entries: EmployeeLedgerEntry[];
+}

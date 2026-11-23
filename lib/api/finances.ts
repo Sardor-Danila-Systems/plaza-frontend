@@ -25,6 +25,10 @@ export interface CreateFinancialTransactionInput {
   recipient?: string;
   /** SALARY only: the payment is an advance (аванс). */
   isAdvance?: boolean;
+  employeeId?: string;
+  /** Salary payout with deductions: accrued = amount (к выдаче) + deductions. */
+  accruedAmount?: string;
+  deductions?: { advanceId: string; amount: string }[];
   comment?: string;
   occurredAt: string;
 }
