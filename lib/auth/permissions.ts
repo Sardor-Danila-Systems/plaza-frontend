@@ -83,7 +83,20 @@ const ROLE_PATHS: Partial<Record<Role, string[]>> = {
   WAREHOUSE: WAREHOUSE_SIDE_PATHS,
 };
 
+/** Demo replies instead of the backend, for building the UI before the
+ * Claude API key exists; the assistant page shows a banner while it is on. */
+export const ASSISTANT_MOCK = process.env.NEXT_PUBLIC_ASSISTANT_MOCK === "1";
+
+/** The assistant appears only once the backend has its key (or in demo mode). */
+const ASSISTANT_ENABLED = ASSISTANT_MOCK || process.env.NEXT_PUBLIC_ASSISTANT_ENABLED === "1";
+
+/** Mirrors plaza-api's @Roles on /assistant. */
+export function canUseAssistant(role: Role | undefined): boolean {
+  return ASSISTANT_ENABLED && (role === "OWNER" || role === "DEVELOPER" || role === "ACCOUNTANT");
+}
+
 export function isPathAllowed(role: Role | undefined, pathname: string): boolean {
+  if (pathname === "/assistant" || pathname.startsWith("/assistant/")) return canUseAssistant(role);
   const paths = role ? ROLE_PATHS[role] : undefined;
   if (!paths) return true;
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));

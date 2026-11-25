@@ -20,6 +20,7 @@ import {
   ScrollText,
   FileSpreadsheet,
   UserCircle,
+  MessageSquareText,
 } from "lucide-react";
 
 export type NavGroup = "OVERVIEW" | "FINANCE" | "WAREHOUSE" | "OPERATIONS" | "REPORTING" | "OBJECTS" | "ACCOUNT";
@@ -54,6 +55,7 @@ export const SECTIONS: NavItem[] = [
   { href: "/write-offs", label: "Списания", icon: ClipboardMinus, group: "WAREHOUSE" },
   { href: "/history", label: "История", icon: History, group: "OPERATIONS" },
   { href: "/analytics", label: "Аналитика", icon: BarChart3, group: "OVERVIEW" },
+  { href: "/assistant", label: "Ассистент", icon: MessageSquareText, group: "OVERVIEW" },
   { href: "/audit", label: "Аудит", icon: ScrollText, group: "OPERATIONS" },
   { href: "/reports", label: "Отчёты", icon: FileSpreadsheet, group: "REPORTING" },
   { href: "/settings/construction", label: "Объекты", icon: Settings, group: "OBJECTS" },
