@@ -62,16 +62,16 @@ export function ActionCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card p-4 shadow-[0_1px_2px_oklch(0.22_0.012_55/0.04)] transition-opacity",
+        "rounded-2xl border bg-card p-4 shadow-[0_1px_2px_oklch(0.22_0.012_55/0.04)] transition-opacity",
         (status === "rejected" || (status === "pending" && expired)) && "opacity-60",
       )}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="flex items-center gap-2.5">
           <Icon className={cn("size-5 shrink-0", income ? "text-success" : "text-destructive")} aria-hidden />
           <div>
             <p className="text-sm font-medium text-foreground">{income ? "Приход" : "Расход"} в кассу</p>
-            <p className="text-lg font-semibold tabular-nums tracking-tight text-foreground">
+            <p className="whitespace-nowrap text-lg font-semibold tabular-nums tracking-tight text-foreground">
               {income ? "+" : "−"}
               {formatMoney(p.amount, p.currency)}
             </p>
