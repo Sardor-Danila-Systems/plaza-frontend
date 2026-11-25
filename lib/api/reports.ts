@@ -23,7 +23,11 @@ export const REPORTS_WITH_PERIOD_FILTER: ReadonlySet<ReportKey> = new Set([
 /** The three printable forms in the 1C layout the accountants know. All take
  * dateFrom/dateTo (default: 1 January to today) plus one form-specific
  * filter — see plaza-api/src/modules/reports/dto/form-report-queries.dto.ts. */
-export type FormReportKey = "supplier-reconciliation" | "material-report" | "cash-journal";
+export type FormReportKey =
+  | "supplier-reconciliation"
+  | "material-report"
+  | "cash-journal"
+  | "employee-ledger";
 
 export interface FormReportParams {
   dateFrom?: string;
@@ -31,6 +35,7 @@ export interface FormReportParams {
   supplierId?: string;
   warehouseId?: string;
   account?: string;
+  employeeId?: string;
 }
 
 export const reportsApi = {

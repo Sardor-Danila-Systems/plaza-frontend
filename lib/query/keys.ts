@@ -16,6 +16,11 @@ export const qk = {
       ["finance", projectId, "list", filters] as const,
     detail: (projectId: string, id: string) => ["finance", projectId, "detail", id] as const,
     categories: (projectId: string) => ["finance", projectId, "categories"] as const,
+    employees: (projectId: string) => ["finance", projectId, "employees"] as const,
+    openAdvances: (projectId: string, id: string) =>
+      ["finance", projectId, "employees", id, "open-advances"] as const,
+    employeeLedger: (projectId: string, id: string) =>
+      ["finance", projectId, "employees", id, "ledger"] as const,
     currencyRates: (projectId: string) => ["finance", projectId, "currency-rates"] as const,
     liveCurrencyRate: (projectId: string) => ["finance", projectId, "currency-rates", "live"] as const,
   },

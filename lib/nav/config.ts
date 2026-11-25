@@ -125,6 +125,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
   { href: "/finance/new?type=INCOME", label: "Приход", icon: ArrowDownCircle, tone: "success" },
   { href: "/finance/new?type=EXPENSE", label: "Расход", icon: ArrowUpCircle, tone: "destructive" },
   { href: "/finance/new?type=SALARY", label: "Зарплата", icon: Banknote, tone: "gold" },
+  { href: "/finance/new?type=SALARY&advance=1", label: "Аванс", icon: Banknote, tone: "gold" },
   { href: "/purchases/new", label: "Закупка", icon: ShoppingCart, tone: "chart-4" },
   { href: "/write-offs/new", label: "Списание", icon: ClipboardMinus, tone: "warning" },
   { href: "/suppliers?action=debt-payment", label: "Оплата поставщику", icon: HandCoins, tone: "chart-5" },

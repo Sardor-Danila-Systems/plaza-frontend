@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
+import Decimal from "decimal.js";
+import { formatMoney } from "@/lib/format/decimal";
 import { MoneyText } from "@/components/shared/money-text";
 import { ConfirmReasonDialog } from "@/components/shared/confirm-dialog";
 import { AttachmentSection } from "@/components/shared/attachment-section";
@@ -57,7 +59,7 @@ export function FinanceDetailClient({ id }: { id: string }) {
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="size-4" />
         </Button>
-        <h1 className="text-lg font-semibold">{TYPE_LABELS[data.type] ?? data.type}</h1>
+        <h1 className="text-lg font-semibold">{data.isAdvance ? "Аванс по зарплате" : (TYPE_LABELS[data.type] ?? data.type)}</h1>
       </div>
 
       <Card>
@@ -83,6 +85,17 @@ export function FinanceDetailClient({ id }: { id: string }) {
             <dt className="text-muted-foreground">Касса</dt>
             <dd className="text-right">{CASH_ACCOUNT_LABELS[data.account]}</dd>
 
+            {data.accruedAmount && (
+              <>
+                <dt className="text-muted-foreground">Начислено</dt>
+                <dd className="text-right">{formatMoney(data.accruedAmount, data.currency)}</dd>
+                <dt className="text-muted-foreground">Удержано авансов</dt>
+                <dd className="text-right">
+                  {formatMoney(new Decimal(data.accruedAmount).minus(data.amount).toFixed(2), data.currency)}
+                </dd>
+              </>
+            )}
+
             {data.categoryNameSnapshot && (
               <>
                 <dt className="text-muted-foreground">Категория</dt>
@@ -93,7 +106,7 @@ export function FinanceDetailClient({ id }: { id: string }) {
             {data.recipient && (
               <>
                 <dt className="text-muted-foreground">
-                  {data.type === "INCOME" ? "Источник" : "Получатель"}
+                  {data.type === "INCOME" ? "Источник" : data.type === "SALARY" ? "Сотрудник" : "Получатель"}
                 </dt>
                 <dd className="text-right">{data.recipient}</dd>
               </>
@@ -121,7 +134,7 @@ export function FinanceDetailClient({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      {(data.type === "INCOME" || data.type === "EXPENSE") && (
+      {(data.type === "INCOME" || data.type === "EXPENSE" || data.type === "SALARY") && (
         <AttachmentSection target="FINANCIAL_TRANSACTION" targetId={id} canMutate={canMutate} />
       )}
 
